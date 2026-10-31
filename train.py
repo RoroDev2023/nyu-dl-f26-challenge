@@ -2,13 +2,19 @@ import argparse
 import json
 import math
 import os
+import random
 import time
 
+import numpy as np
 import torch
-import torch.nn as nn
+import torch.nn.functional as F
 
 from data import get_loaders
-from models import ResNet, ARCHS, count_params
+from models import ARCHS, TEACHER_ARCHS, build_model, load_model, count_params
+from tricks import EMA, mix_batch, mixed_ce, teacher_probs, kd_loss, sam_perturb, sam_restore
+
+# flags that can change between a run and its resume without changing the result
+RESUME_SAFE_ARGS = {"workers", "save_every", "compile", "device"}
 
 
 def get_device():
@@ -19,20 +25,90 @@ def get_device():
     return torch.device("cpu")
 
 
-def evaluate(model, loader, device):
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)     # also seeds CUDA and MPS
+
+
+def get_rng_state(device):
+    state = {"python": random.getstate(), "numpy": np.random.get_state(),
+             "torch": torch.get_rng_state()}
+    if device.type == "cuda":
+        state["cuda"] = torch.cuda.get_rng_state()
+    elif device.type == "mps":
+        state["mps"] = torch.mps.get_rng_state()
+    return state
+
+
+def set_rng_state(state, device):
+    random.setstate(state["python"])
+    np.random.set_state(state["numpy"])
+    torch.set_rng_state(state["torch"])
+    if device.type == "cuda" and "cuda" in state:
+        torch.cuda.set_rng_state(state["cuda"])
+    elif device.type == "mps" and "mps" in state:
+        torch.mps.set_rng_state(state["mps"])
+
+
+def get_amp(device):
+    """Mixed precision on NVIDIA GPUs only: bf16 if the GPU has it, else fp16 + GradScaler.
+    Plain fp32 on Mac/CPU. Returns (autocast dtype or None, scaler). The scaler does
+    nothing when disabled, so the training loop is the same in all cases."""
+    dtype = None
+    if device.type == "cuda":
+        dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+    return dtype, torch.amp.GradScaler(device.type, enabled=dtype == torch.float16)
+
+
+def save_atomic(state, path):
+    """A kill during torch.save only ever damages the tmp file, never last.pt."""
+    tmp = path + ".tmp"
+    torch.save(state, tmp)
+    os.replace(tmp, path)
+
+
+def evaluate(model, loader, device, tta=False):
+    """Accuracy. tta: average the predictions of each image and its mirror image."""
     model.eval()
     correct = total = 0
     with torch.no_grad():
         for x, y in loader:
             x, y = x.to(device), y.to(device)
-            correct += (model(x).argmax(1) == y).sum().item()
+            if device.type == "cuda":
+                x = x.to(memory_format=torch.channels_last)
+            pred = F.softmax(model(x), 1)
+            if tta:
+                pred = pred + F.softmax(model(x.flip(-1)), 1)
+            correct += (pred.argmax(1) == y).sum().item()
             total += len(y)
     return correct / total
 
 
+def check_resume_args(saved, current):
+    """Refuse to continue a run with different settings: it would silently be another run."""
+    changed = {k: (saved.get(k), v) for k, v in current.items()
+               if k not in RESUME_SAFE_ARGS and saved.get(k) != v}
+    if changed:
+        raise SystemExit(f"{current['out']} holds a run with other settings, use a new --out "
+                         f"(saved, now): {changed}")
+
+
+def trim_log(log_path, last_epoch):
+    """Drop log rows from epochs after the checkpoint: they will be trained again."""
+    with open(log_path) as f:
+        lines = f.readlines()
+    with open(log_path, "w") as f:
+        f.writelines(lines[:1] + [l for l in lines[1:] if int(l.split(",")[0]) <= last_epoch])
+
+
+def fmt(acc):
+    return "" if acc is None else f"{acc:.5f}"
+
+
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--arch", default="r3_64_3-5-3", choices=ARCHS.keys())
+    p.add_argument("--arch", default="r3_64_3-5-3", choices=[*ARCHS, *TEACHER_ARCHS])
     p.add_argument("--epochs", type=int, default=200)
     p.add_argument("--batch-size", type=int, default=128)
     p.add_argument("--lr", type=float, default=0.1)
@@ -41,23 +117,83 @@ def main():
     p.add_argument("--label-smoothing", type=float, default=0.1)
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--out", default="runs/baseline")
+    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--val-size", type=int, default=5000, help="0 = train on all 50k")
+    p.add_argument("--no-budget", action="store_true", help="teachers: skip the 5M assert")
+    # knowledge distillation
+    p.add_argument("--teachers", nargs="*", default=[], help="teacher checkpoints")
+    p.add_argument("--kd-alpha", type=float, default=0.9)
+    p.add_argument("--kd-temp", type=float, default=4)
+    # augmentation
+    p.add_argument("--autoaug", default="none",
+                   choices=["none", "trivial", "randaug", "autoaug_cifar"])
+    p.add_argument("--cutout", type=int, default=0, help="square size in pixels, 0 = off")
+    p.add_argument("--mixup-alpha", type=float, default=0)
+    p.add_argument("--cutmix-alpha", type=float, default=0)
+    p.add_argument("--mix-prob", type=float, default=1.0, help="chance to mix each batch")
+    p.add_argument("--mix-off-epochs", type=int, default=0, help="no mixing for the last N")
+    p.add_argument("--gpu-aug", action="store_true", help="augment batches on the GPU")
+    p.add_argument("--aug-chunk", type=int, default=16, help="--gpu-aug: images per policy draw")
+    # SAM, EMA
+    p.add_argument("--sam", action="store_true")
+    p.add_argument("--sam-rho", type=float, default=0.05,
+                   help="with --asam use a larger rho, the ASAM paper uses 0.5 on CIFAR-10")
+    p.add_argument("--asam", action="store_true", help="adaptive SAM (implies --sam)")
+    p.add_argument("--ema-decay", type=float, default=0, help="0 = off")
+    # architecture options (ResNet students only)
+    p.add_argument("--se", action="store_true")
+    p.add_argument("--drop-path", type=float, default=0)
+    p.add_argument("--dropout", type=float, default=0)
+    # infrastructure
+    p.add_argument("--save-every", type=int, default=1, help="checkpoint every N epochs")
+    p.add_argument("--compile", action="store_true")
+    p.add_argument("--limit-batches", type=int, default=0, help="debug: stop epochs early")
+    p.add_argument("--device", default=None, help="default: cuda, else mps, else cpu")
     args = p.parse_args()
+
+    if args.arch in ARCHS:
+        config = dict(ARCHS[args.arch], se=args.se, drop_path=args.drop_path,
+                      dropout=args.dropout)
+    elif args.se or args.drop_path or args.dropout:
+        p.error("--se, --drop-path and --dropout only apply to ResNet students")
+    else:
+        config = dict(TEACHER_ARCHS[args.arch])
+
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, "args.json"), "w") as f:
         json.dump(vars(args), f, indent=2)
 
-    device = get_device()
+    set_seed(args.seed)
+    device = torch.device(args.device) if args.device else get_device()
     print("device:", device)
-    train_loader, val_loader = get_loaders(args.batch_size, num_workers=args.workers)
+    if device.type == "cuda":
+        torch.backends.cudnn.benchmark = True     # images are all the same size
+    train_loader, val_loader = get_loaders(args.batch_size, args.val_size, args.workers,
+                                           args.autoaug, args.cutout, args.gpu_aug, device,
+                                           args.aug_chunk)
 
-    model = ResNet(**ARCHS[args.arch]).to(device)
-    n_params = count_params(model)
+    raw_model = build_model(config).to(device)
+    n_params = count_params(raw_model)
     print(f"arch {args.arch}: {n_params:,} params")
-    assert n_params <= 5_000_000, "over the 5M budget!"
+    assert args.no_budget or n_params <= 5_000_000, "over the 5M budget!"
+    if device.type == "cuda":
+        raw_model.to(memory_format=torch.channels_last)
+    # checkpoints and EMA use raw_model: a compiled model renames all its weights
+    model = torch.compile(raw_model) if args.compile else raw_model
+    ema = EMA(raw_model, args.ema_decay) if args.ema_decay > 0 else None
+
+    teachers = []
+    for path in args.teachers:
+        teacher, ckpt = load_model(path)
+        print(f"teacher {path}: {ckpt['arch']}, {count_params(teacher):,} params")
+        teachers.append(teacher.to(device).eval().requires_grad_(False))
+        if args.val_size > 0 and ckpt.get("args", {}).get("val_size") != args.val_size:
+            print("WARNING: this teacher did not hold out the same val set, "
+                  "so val accuracy of this run can't be trusted")
 
     # no weight decay on BatchNorm weights/biases (1-D params)
-    decay = [p for p in model.parameters() if p.ndim > 1]
-    no_decay = [p for p in model.parameters() if p.ndim <= 1]
+    decay = [p for p in raw_model.parameters() if p.ndim > 1]
+    no_decay = [p for p in raw_model.parameters() if p.ndim <= 1]
     optimizer = torch.optim.SGD(
         [{"params": decay, "weight_decay": args.wd},
          {"params": no_decay, "weight_decay": 0.0}],
@@ -65,6 +201,8 @@ def main():
 
     # LR schedule per step: linear warmup, then cosine down to 0
     steps_per_epoch = len(train_loader)
+    if args.limit_batches:
+        steps_per_epoch = min(steps_per_epoch, args.limit_batches)
     total_steps = args.epochs * steps_per_epoch
     warmup_steps = args.warmup * steps_per_epoch
 
@@ -75,48 +213,127 @@ def main():
         return 0.5 * (1 + math.cos(math.pi * progress))
 
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_factor)
-    criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
+    label_smoothing = 0.0 if teachers else args.label_smoothing
 
-    # bf16 mixed precision on NVIDIA GPUs only (faster); plain fp32 on Mac/CPU
-    use_amp = device.type == "cuda"
+    amp_dtype, scaler = get_amp(device)
+    print("mixed precision:", amp_dtype)
 
+    def autocast():
+        return torch.autocast(device.type, dtype=amp_dtype, enabled=amp_dtype is not None)
+
+    def compute_loss(logits, y_a, y_b, lam, probs):
+        hard = mixed_ce(logits, y_a, y_b, lam, label_smoothing)
+        if not teachers:
+            return hard
+        return args.kd_alpha * kd_loss(logits, probs, args.kd_temp) + (1 - args.kd_alpha) * hard
+
+    # resume if this folder already has a checkpoint
+    last_path = os.path.join(args.out, "last.pt")
     log_path = os.path.join(args.out, "log.csv")
-    with open(log_path, "w") as f:
-        f.write("epoch,lr,train_loss,train_acc,val_acc,seconds\n")
+    start_epoch = 0
+    if os.path.exists(last_path):
+        # on the CPU first: the RNG states must stay there
+        ckpt = torch.load(last_path, map_location="cpu", weights_only=False)
+        if "args" not in ckpt:
+            raise SystemExit(f"{last_path} has an old format, use a new --out")
+        check_resume_args(ckpt["args"], vars(args))
+        raw_model.load_state_dict(ckpt["model"])
+        optimizer.load_state_dict(ckpt["optimizer"])
+        scheduler.load_state_dict(ckpt["scheduler"])
+        scaler.load_state_dict(ckpt["scaler"])
+        if ema:
+            ema.load_state_dict(ckpt["ema"])
+        set_rng_state(ckpt["rng"], device)
+        start_epoch = ckpt["epoch"]
+        trim_log(log_path, start_epoch)
+        print(f"resumed from epoch {start_epoch}")
+    else:
+        with open(log_path, "w") as f:
+            f.write("epoch,lr,train_loss,train_acc,val_acc,val_acc_ema,seconds,data_seconds\n")
 
-    for epoch in range(1, args.epochs + 1):
+    for epoch in range(start_epoch + 1, args.epochs + 1):
         model.train()
         t0 = time.time()
-        loss_sum, correct, seen = 0.0, 0, 0
-        for x, y in train_loader:
-            x, y = x.to(device), y.to(device)
-            with torch.autocast("cuda", dtype=torch.bfloat16, enabled=use_amp):
-                logits = model(x)
-                loss = criterion(logits.float(), y)
-            optimizer.zero_grad(set_to_none=True)
-            loss.backward()
-            optimizer.step()
-            scheduler.step()
+        data_secs = 0.0
+        # running [sum of loss, sum of correct] stays on the GPU: .item() would sync every step
+        totals = torch.zeros(2, device=device)
+        seen = 0
+        mix_on = epoch <= args.epochs - args.mix_off_epochs
+        batches = iter(train_loader)
+        for _ in range(steps_per_epoch):
+            t_data = time.time()
+            x, y = next(batches)
+            data_secs += time.time() - t_data
+            x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
 
-            loss_sum += loss.item() * len(y)
-            correct += (logits.argmax(1) == y).sum().item()
+            y_a, y_b, lam = y, y, 1.0
+            if mix_on:
+                x, y_a, y_b, lam = mix_batch(x, y, args.mixup_alpha, args.cutmix_alpha,
+                                             args.mix_prob)
+            if device.type == "cuda":
+                x = x.to(memory_format=torch.channels_last)
+
+            with autocast():
+                # teachers see exactly the student's augmented + mixed batch
+                probs = teacher_probs(teachers, x, args.kd_temp) if teachers else None
+                logits = model(x)
+                loss = compute_loss(logits.float(), y_a, y_b, lam, probs)
+            optimizer.zero_grad(set_to_none=True)
+            scaler.scale(loss).backward()
+
+            if args.sam or args.asam:
+                # second pass at the perturbed weights; its gradients make the real step.
+                # BatchNorm running stats must come from the first pass only. Copying them
+                # back also works with --compile (changing bn.momentum might not).
+                params, backup = sam_perturb(decay + no_decay, args.sam_rho, args.asam,
+                                             scaler.get_scale())
+                bn_stats = [b.clone() for b in raw_model.buffers()]
+                optimizer.zero_grad(set_to_none=True)
+                with autocast():
+                    loss2 = compute_loss(model(x).float(), y_a, y_b, lam, probs)
+                scaler.scale(loss2).backward()
+                sam_restore(params, backup)
+                for b, saved in zip(raw_model.buffers(), bn_stats):
+                    b.copy_(saved)
+
+            scaler.step(optimizer)
+            scaler.update()
+            scheduler.step()
+            if ema:
+                ema.update(raw_model)
+
+            pred = logits.detach().argmax(1)
+            correct = lam * (pred == y_a).sum() + (1 - lam) * (pred == y_b).sum()
+            totals += torch.stack([loss.detach().float() * len(y), correct.float()])
             seen += len(y)
 
-        val_acc = evaluate(model, val_loader, device)
+        val_acc = evaluate(raw_model, val_loader, device) if val_loader else None
+        ema_acc = evaluate(ema.module, val_loader, device) if val_loader and ema else None
         secs = time.time() - t0
         lr = optimizer.param_groups[0]["lr"]
-        print(f"epoch {epoch:3d}/{args.epochs}  lr {lr:.4f}  loss {loss_sum / seen:.4f}  "
-              f"train_acc {correct / seen:.4f}  val_acc {val_acc:.4f}  ({secs:.0f}s)", flush=True)
+        loss_avg, acc_avg = (totals / seen).tolist()
+        print(f"epoch {epoch:3d}/{args.epochs}  lr {lr:.4f}  loss {loss_avg:.4f}  "
+              f"train_acc {acc_avg:.4f}  val_acc {fmt(val_acc)}  val_ema {fmt(ema_acc)}  "
+              f"({secs:.0f}s, {data_secs:.0f}s waiting for data)", flush=True)
         with open(log_path, "a") as f:
-            f.write(f"{epoch},{lr:.6f},{loss_sum / seen:.5f},{correct / seen:.5f},{val_acc:.5f},{secs:.1f}\n")
+            f.write(f"{epoch},{lr:.6f},{loss_avg:.5f},{acc_avg:.5f},{fmt(val_acc)},{fmt(ema_acc)},"
+                    f"{secs:.1f},{data_secs:.1f}\n")
 
-        torch.save({"arch": args.arch, "model": model.state_dict(), "epoch": epoch,
-                    "optimizer": optimizer.state_dict(), "scheduler": scheduler.state_dict()},
-                   os.path.join(args.out, "last.pt"))
+        if epoch % args.save_every == 0 or epoch == args.epochs:
+            save_atomic({"arch": args.arch, "config": config, "args": vars(args),
+                         "model": raw_model.state_dict(), "epoch": epoch,
+                         "ema": ema.state_dict() if ema else None,
+                         "optimizer": optimizer.state_dict(), "scheduler": scheduler.state_dict(),
+                         "scaler": scaler.state_dict(), "rng": get_rng_state(device)}, last_path)
 
+    results = {"arch": args.arch, "params": n_params, "epochs": args.epochs}
+    for name, net in [("val_acc", raw_model), ("val_acc_ema", ema.module if ema else None)]:
+        have_val = net is not None and val_loader is not None
+        results[name] = evaluate(net, val_loader, device) if have_val else None
+        results[name + "_tta"] = evaluate(net, val_loader, device, tta=True) if have_val else None
     with open(os.path.join(args.out, "results.json"), "w") as f:
-        json.dump({"arch": args.arch, "params": n_params, "val_acc": val_acc}, f, indent=2)
-    print("done. final val_acc:", val_acc)
+        json.dump(results, f, indent=2)
+    print("done.", results)
 
 
 if __name__ == "__main__":
