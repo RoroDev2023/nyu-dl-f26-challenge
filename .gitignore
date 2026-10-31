@@ -1,0 +1,11 @@
+data/
+runs/
+.venv-1/
+.venv/
+*.pt
+*.png
+*.zip
+*.npz
+submission.csv
+__pycache__/
+.DS_Store
