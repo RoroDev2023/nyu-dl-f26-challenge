@@ -9,3 +9,7 @@ runs/
 submission.csv
 __pycache__/
 .DS_Store
+logs/
+runs/
+submission*.csv
+data
