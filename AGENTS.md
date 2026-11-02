@@ -13,37 +13,41 @@ numbers: `STATUS.md`.
 - The eval is **new natural photos**, not corrupted CIFAR-10. See
   `runs/analysis/shift.md`. Prioritize natural-photo robustness (AugMix/RandAugment,
   CutMix/MixUp, scale/translation/rotation, color/lighting) over noise/blur/JPEG.
-- Team conventions: seed-0 5k split, run names `A_...`/`B_...`, 5 submissions/day
-  (2 ours, 2 theirs, 1 spare), final pick = 2 single ≤5M models by val + shifted
-  val, not public LB.
-- The 5M rule for **teachers** is unresolved; `--no-budget` exists for them.
+- Team conventions: seed-0 5k split, `A_...`/`B_...` run names, 5 submissions/day
+  (2 ours, 2 theirs, 1 spare). The final submission must be **one ≤5M network — no
+  ensembles**; keep 2 candidate single models chosen by val + shifted val, not public LB.
+- Teachers may be any size (trained from scratch on the same train data); use
+  `--no-budget`. Only the submitted student must be ≤5M.
 
 ## Environment
 
-- **HPC**: `./submit.sh run.sbatch ...` (Slurm A100; `run.sbatch` activates
-  `~/venvs/dl-hw2` and runs `train.py "$@"`). Create `logs/` once.
+- **HPC**: Open OnDemand Jupyter (use a CPU session for setup), edit the two paths
+  in `run.sbatch`, create `logs/`, and submit with
+  `./submit.sh --job-name=A_... run.sbatch ...` (not raw `sbatch`; it unsets the
+  Jupyter Slurm env vars). ~2 A100 jobs/user; 300 GPU-hours for the team.
 - **Local**: use `~/miniforge3/envs/ml/bin/python` (torch 2.10) or
   `~/venvs/dl-hw2` if present. Run from the repo root; imports are flat.
-- **Data**: `data/train_cache.npz` (50k `x`/`y`), `data/test.csv`,
-  `data/test_images/`, `data/sample_submission.csv`; `data/` is gitignored. If the
-  cache is missing, `data.load_train()` builds it from `train_labels.csv` +
-  `train_images/` (~1 min). Never train or select on the eval images.
+- **Data**: `hpc_data.zip` from the team Drive (ask Rahim) unzips to `data/`;
+  `data/train_cache.npz` holds the decoded 50k train set, and the zip has no
+  `train_images/`, so keep the cache. Expected: `train_cache.npz`, `test.csv`,
+  `test_images/`, `sample_submission.csv`. `data/` is gitignored. Never train or
+  select on the eval images.
 - `opencode.json` holds the local Kaggle MCP token and is excluded via
   `.git/info/exclude`; never commit or print it.
 
 ## Commands
 
-- Smoke: `python train.py --epochs 1 --limit-batches 2 --out runs/B_smoke --ema-decay 0.999`
-- Baseline: `python train.py --arch r3_64_3-5-3 --epochs 200 --out runs/A_baseline --ema-decay 0.999`
-- All tricks: add `--autoaug randaug --cutmix-alpha 1.0 --mixup-alpha 0.4 --mix-prob 1.0 --epochs 300`
-- KD: add `--teachers t1.pt t2.pt --kd-alpha 0.9 --kd-temp 4`. Teachers must use the
-  same `--val-size`; label smoothing is auto-disabled when teachers are present.
-- Teacher: `--arch pyramid_110_270 --no-budget` (28.5M; **not submittable**).
+- Smoke: `python train.py --epochs 1 --warmup 1 --limit-batches 5 --workers 0 --out runs/B_smoke`
+- Baseline: `python train.py --epochs 200 --workers 10 --save-every 5 --out runs/A_baseline`
+- All tricks (team recipe): add `--autoaug trivial --cutout 16 --mixup-alpha 0.2 --cutmix-alpha 1.0 --mix-off-epochs 15 --sam --ema-decay 0.999 --epochs 300`
+- KD: add `--teachers t1.pt t2.pt --kd-alpha 0.9 --kd-temp 4 --epochs 600`; teachers must use the same `--val-size`. Label smoothing is auto-disabled when teachers are present.
+- Teacher: `--arch wrn_28_10 --no-budget --epochs 400 ... --seed 0` (or `pyramid_110_270`, no SAM). Use a different seed per teacher.
+- Teacher architecture preset: `pyramid_110_270` is 28.5M; `wrn_28_10` is 36.5M. Both need `--no-budget`.
 - Full data: `--val-size 0` (no validation; final runs).
-- Predict: `python predict.py runs/<run>/last.pt --out submission.csv` (EMA by
-  default, horizontal-flip TTA, asserts ≤5M).
+- Predict: `python predict.py runs/<run>/last.pt --out submission.csv` (EMA by default, hflip TTA, asserts ≤5M). One model only; no ensembles.
 - Summarize: `python scripts/summarize.py --runs runs`
-- HPC submit: `./submit.sh run.sbatch --arch ... --out runs/A_...`
+- If `log.csv` shows `data_seconds` dominates, add `--gpu-aug` and adjust `--workers`.
+- HPC submit: `./submit.sh --job-name=A_... run.sbatch --arch ... --out runs/A_...`
 
 ## Conventions
 
@@ -53,8 +57,11 @@ numbers: `STATUS.md`.
   `results.json` holds final val/EMA/TTA; `log.csv` holds per-epoch rows.
 - Checkpoint format is `config` + `model`/`ema`; **our old `../proj1` checkpoints are
   incompatible** with `models.load_model`.
-- Name runs `A_...` or `B_...`; `scripts/summarize.py` sorts them apart.
+- Name runs `A_...` or `B_...`; `scripts/summarize.py` sorts them apart. Add new
+  rows to the README results table.
 - The 5M assert is in `train.py`/`predict.py`; `--no-budget` is only for teachers.
+- The final submission is **one ≤5M network; ensembles are not allowed as the final
+  model**. Use `predict.py` with a single checkpoint.
 - Our archived code and older analysis live in `../proj1/our_code_backup/`; the
   shift report is copied to `runs/analysis/`.
 
@@ -62,5 +69,5 @@ numbers: `STATUS.md`.
 
 - `export KAGGLE_API_TOKEN=$(tr -d '[:space:]' < ~/.kaggle/kgat.txt)`
 - `kaggle competitions submit -c cifar-10-res-net-architecture-challenge-dl -f submission.csv -m "run val=..."`
-- 5/day for the team; public score is 1k images (~±1.1pp). Final picks by val +
-  shifted val, not public LB.
+- 5/day for the team (2 ours, 2 theirs, 1 spare). Public score is 1k images
+  (~±1.1pp). Final picks are single models chosen by val + shifted val, not public.

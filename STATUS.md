@@ -9,6 +9,9 @@
   (`runs/B_smoke`).
 - **Team best: 0.904 public** (teammate, 2-teacher KD, 97.76 val). Our best from the
   old repo: **0.864** (96.50 val ensemble).
+- README rules: the final submission is **one ≤5M network — no ensembles**; teachers
+  may be any size (`--no-budget`). The 0.864 ensemble is reference only, not a valid
+  final model.
 - Eval is **new natural photographs** (CIFAR-10.1-like), not corrupted CIFAR. See
   `runs/analysis/shift.md`; prioritize natural-photo robustness, not noise/blur/JPEG.
 - Next: B3 natural-photo augmentation ablations on `r3_64_3-5-3`; no submissions
@@ -26,7 +29,8 @@
 | old repo: WRN-40-4 teacher | 96.60 | — | 8.98M, not submittable |
 
 Val numbers are not directly comparable across repos/splits; this repo uses the
-seed-0 5k split.
+seed-0 5k split. The old 0.864 row is an ensemble and is **not eligible as the final
+model** under the README rule (one ≤5M network, no ensembles).
 
 ## Shift analysis (B1/B2)
 
@@ -38,9 +42,12 @@ seed-0 5k split.
 
 ## Repo state
 
-- Branch: `b_shift` (docs untracked; commit when reviewed).
-- Data: `data` symlink → `../proj1/data`, including the 154MB
-  `train_cache.npz` generated from the official CIFAR-10 batches.
+- Branch: `b_shift`; README pulled and merged (`b3cbec6`). Docs updated after the
+  README; commit when reviewed.
+- Data: `data` symlink → `../proj1/data`, including the 147MB
+  `train_cache.npz` generated from the official CIFAR-10 batches. This matches the
+  README's `hpc_data.zip` cache; `train_labels.csv` is absent but not needed while
+  the cache exists.
 - `opencode.json` has the local Kaggle MCP token; excluded via `.git/info/exclude`.
 - `runs/B_smoke` is the 2-batch smoke test (not a real model).
 - No HPC or Modal jobs running.
@@ -49,12 +56,15 @@ seed-0 5k split.
 
 1. Review/commit `AGENTS.md`, `PLAN.md`, `STATUS.md` on `b_shift`.
 2. Port B1/B2 to this repo's `data.py`/`models.py` and seed-0 split.
-3. B3 natural-photo ablations on `r3_64_3-5-3`; log runs as `B_...`.
+3. B3 natural-photo ablations on `r3_64_3-5-3`, based on the team all-tricks recipe
+   (`--autoaug trivial --cutout 16 --mixup-alpha 0.2 --cutmix-alpha 1.0
+   --mix-off-epochs 15 --sam --ema-decay 0.999`); log runs as `B_...`.
 4. B4 merge winning flag; B5 KD check with Track A's 3 teachers.
-5. Keep submissions for clear val/shifted-val wins; final pick 2 single ≤5M models.
+5. Keep submissions for clear val/shifted-val wins; final pick is one ≤5M network.
 
 ## Open questions for the teammate
 
-- Teacher 5M rule; teacher checkpoints and the exact "all tricks" flags.
+- Teacher checkpoints and the exact "all tricks" flags for the 97.76 run.
 - Which branch/commits are current for Track A?
 - Is `summarize.py` the canonical results table, and are run names `A_...`/`B_...`?
+- Does our `train_cache.npz` match `hpc_data.zip`?
