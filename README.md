@@ -32,11 +32,13 @@ Our approach:
 | `scripts/summarize.py` | Collects every `runs/*/results.json` into one sorted table |
 | `run.sbatch` | Slurm job script: 1 A100, runs `python train.py <your flags>` |
 | `submit.sh` | Wrapper around `sbatch` for the HPC Jupyter session (see section 8) |
+| `modal_train.py` | Runs `train.py` / `predict.py` on Modal cloud GPUs (see section 8b) |
+| `scripts/modal_upload.sh` | One-time upload of data + teachers to the Modal volume |
 | `check_data.py` | Sanity check: loads train/test data and saves `check_data.png` with sample images |
 | `check_loader.py` | Sanity check: shows an augmented training batch (`check_loader.png`) |
 | `check_model.py` | Prints the param count of every student and teacher preset |
 
-Not in git (see `.gitignore`): `data/`, `runs/`, `logs/`, checkpoints (`*.pt`), zips,
+Not in git (see `.gitignore`): `data/`, `runs/`, `logs/`, `teachers/`, checkpoints (`*.pt`), zips,
 images, `submission*.csv`.
 
 ## 4. Data setup
@@ -294,6 +296,29 @@ A100 timings per epoch:
 | KD student, 2 teachers | ~30 |
 | WRN-28-10 + SAM | 29 |
 | PyramidNet-110-270 | 45 |
+
+## 8b. Running on Modal
+
+[Modal](https://modal.com) runs `train.py` unchanged on a cloud GPU (A100-40GB by default,
+~$2.10/h; H100 ~$3.95/h). `modal_train.py` builds an image with only the repo's `.py` files
+and `scripts/`. Two volumes hold everything else: `resnet5m-data` (`data/`, `teachers/`) and
+`resnet5m-runs` (`runs/`). Inside the container, `data/`, `teachers/` and `runs/` link to them.
+
+```bash
+source .venv-1/bin/activate
+./scripts/modal_upload.sh            # once: data (no train_images) + teachers/*.pt
+
+# train: any train.py flags; --out must be under runs/. --detach keeps it running
+# after you close the terminal. Rerunning the exact same command resumes from last.pt.
+modal run --detach modal_train.py --gpu A100-40GB --args "--out runs/X <flags>"
+
+modal app logs -f resnet5m           # follow the logs live (no -f: last 100 lines)
+modal volume get resnet5m-runs X ./runs/                      # download runs/X
+modal run modal_train.py::predict_entry --checkpoint runs/X/last.pt --out runs/X/submission.csv
+```
+
+The runs volume is committed every 5 minutes and at the end, so if a job is killed (timeout
+24h, credits run out) at most ~5 minutes of checkpoints are lost.
 
 ## 9. Predicting and submitting
 
