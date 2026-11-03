@@ -15,8 +15,10 @@
   shifted proxy 89.02 vs 84.32 control — our best single ≤5M model so far.
 - Running now: `B_trivial_300_sam`, the same recipe with `--autoaug trivial` (the
   team's "all tricks"), so B4's gain can be separated from "300 epochs + SAM".
-- **B5 (KD + AugMix) is blocked**: no compatible teacher checkpoints yet. Old
-  `../proj1` checkpoints do not load in this repo (no `config`/`ema`, other arch names).
+  **B4 close-out is the critical path** — A5 (robust teachers) is waiting on it.
+- **B5 (KD + AugMix) is downstream of A5, which is downstream of B4.** No teacher
+  checkpoints exist yet, and old `../proj1` ones do not load (no `config`/`ema`,
+  different arch names).
 
 ## Results (seed-0 5k split, this repo unless noted)
 
@@ -100,16 +102,30 @@ is the more robust of the two on every shifted proxy we measure.
   `scripts/shift_analysis.py --tta` is parsed but unused — its tables are always
   no-TTA.
 
-## Next steps
+## Next steps — B4 close-out is the critical path
 
-1. `B_trivial_300_sam` (running) — is the B4 gain AugMix or just "300 ep + SAM"?
-   Evaluate it with `scripts/shift_analysis.py --checkpoints` on clean + combo.
-2. B5 (KD + AugMix): blocked on teacher checkpoints; ask Track A for
-   `teacher_wrn_s0.pt` / `teacher_pyr_s2.pt` in this repo's checkpoint format.
-   Do not train our own 36.5M teacher on Modal — the team's A100 budget already
-   covers A5.
-3. Submission: none used today. `B_augmix_300_sam` is the first candidate worth a
-   submission, once the trivial control confirms AugMix is the reason.
+Dependency chain: **B4 (us) → A5 (robust teachers) → B5 (KD + AugMix)**. A5 has not
+started because it waits on B4, and B5 needs A5's teachers, so nothing downstream
+moves until B4 is signed off. Do not buy that time back by training a 36.5M teacher
+on Modal: that duplicates A5 (which runs on the team's A100 credit) and yields one
+teacher instead of three.
+
+What "B4 done" needs:
+
+1. `B_trivial_300_sam` (running, ~20 s/epoch, finishes ≈23:40 EST) — same 300-ep +
+   SAM recipe with `--autoaug trivial`. This is the control that attributes the B4
+   gain to AugMix rather than to the longer schedule.
+2. Shift-eval it into its own dir so the comparison stays side by side:
+   `python scripts/shift_analysis.py --checkpoints runs/B_trivial_300_sam/last.pt --out-dir runs/analysis/B4_trivial`
+3. Put the head-to-head in STATUS/README, commit, and tell Track A the flag and the
+   recipe (`--autoaug augmix`, 300 ep + SAM, 97.06 val / 89.02 shifted) so A5 can
+   start immediately with AugMix teachers.
+4. Then the next question is the final single model, not another augmentation: a
+   second AugMix seed (~1.75 h, ~$2) for seed variance, since the final pick is one
+   ≤5M network and a lucky seed is real risk at ±0.15 val.
+
+Submission: none used today. `B_augmix_300_sam` is the first candidate worth a
+submission, once step 1/2 confirm AugMix is the reason.
 
 ## Open questions for the teammate
 

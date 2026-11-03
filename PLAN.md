@@ -63,10 +63,12 @@ Updated 2026-11-03: B1–B4 are done; B5 is blocked on teacher checkpoints.
    Control run `B_trivial_300_sam` (team "all tricks", no AugMix) is running to
    separate the AugMix gain from the longer schedule.
 4. **B5 — one 3-teacher KD run with the winning augmentation** vs without.
-   **Blocked:** needs `teacher_wrn_s0/s1` + `teacher_pyr_s2` in this repo's
-   `config`+`ema` format. Do not train a 36.5M teacher on Modal — A5 covers that on
-   the A100s. Meanwhile the cheap proxy is KD from whichever student is best, but a
-   teacher at ~97 val cannot teach a 97.06 student much.
+   **Dependency chain: B4 close-out → A5 (robust teachers) → B5.** A5 has not
+   started because it waits on B4, and B5 needs A5's teachers (`teacher_*_augmix`,
+   this repo's `config`+`ema` format). Old `../proj1` checkpoints do not load, so
+   there is nothing to distil from until A5 lands. Do **not** train a 36.5M teacher
+   on Modal in the meantime: it duplicates A5 on paid credit and gives one teacher
+   instead of three. B5 is a Nov 4+ item.
 
 ## Track A (teammate, for context)
 

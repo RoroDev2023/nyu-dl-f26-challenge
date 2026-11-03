@@ -16,8 +16,10 @@ numbers: `STATUS.md`.
 - **Our best single ≤5M model: `B_augmix_300_sam`** — 97.06 val (97.04 EMA+TTA),
   shifted proxy 89.02 vs 84.32 for the control, 300 ep + SAM + `--autoaug augmix`.
   AugMix was the B3 sweep winner; `--autoaug trivial` control is `B_trivial_300_sam`.
-- **B5 (KD on top of AugMix) is blocked** on Track A's teacher checkpoints. Old
-  `../proj1` checkpoints are incompatible; do not retrain 36.5M teachers locally.
+- **B5 (KD on top of AugMix) is downstream of A5, which is downstream of B4**:
+  A5 (robust teachers) has not started and cannot until B4 is signed off, and B5
+  needs A5's teachers. Old `../proj1` checkpoints are incompatible, and training a
+  36.5M teacher on Modal would duplicate A5 — so B5 is a Nov 4+ item.
 - Team conventions: seed-0 5k split, `A_...`/`B_...` run names, 5 submissions/day
   (2 ours, 2 theirs, 1 spare). The final submission must be **one ≤5M network — no
   ensembles**; keep 2 candidate single models chosen by val + shifted val, not public LB.
