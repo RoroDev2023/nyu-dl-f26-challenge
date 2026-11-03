@@ -62,6 +62,10 @@ corruption gallery: `runs/analysis/corruption_gallery.png`.
    Note: the README's B2/B3 list suggests noise/blur/JPEG; our visual B1 says the
    eval is new natural photos. Prioritize natural-photo variants and share the
    montage with Track A before committing to corruption augmentations.
+   **Pilot result (2026-11-02):** adding affine 15° + translate 0.1 + scale 0.9–1.1
+   + color jitter lost 1.0pp clean val and did not improve the combo shifted val.
+   Rejected. Next, if anything, try a milder geometry-only variant or replace
+   `trivial` with `randaug`/`autoaug_cifar` rather than adding transforms.
 3. **B4 — merge the winner as a flag** in this repo and tell Track A.
 4. **B5 — one 3-teacher KD run with the winning augmentation** vs without.
 

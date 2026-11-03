@@ -40,6 +40,18 @@ model** under the README rule (one ≤5M network, no ensembles).
 - Synthetic `combo` corruption matches the *size* of the drop (~9.1pp), not the
   mechanism. Do not optimize primarily on noise/blur/JPEG.
 
+## B3 pilot (2026-11-02)
+
+- Control (team aug base, 150 epochs, no SAM): **96.28 EMA / 96.48 TTA** clean;
+  combo shifted 84.32.
+- `--extra-aug` (affine 15° + translate 0.1 + scale 0.9–1.1 + color jitter):
+  95.20 / 95.46 clean; combo 84.38.
+- **Rejected**: −1.0pp clean, no shifted gain. Do not merge `--extra-aug` to main;
+  the base TrivialAugment + cutout + CutMix recipe is already strong.
+- Full table: `runs/analysis/B_shift.md`.
+- Next B3 candidates if needed: a **milder geometry-only** variant, or replacing
+  `trivial` with `randaug`/`autoaug_cifar` (not adding on top).
+
 ## Repo state
 
 - Branch: `b_shift`; README pulled and merged (`b3cbec6`). Docs updated after the

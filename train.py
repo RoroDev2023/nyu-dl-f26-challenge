@@ -128,6 +128,8 @@ def main():
     p.add_argument("--autoaug", default="none",
                    choices=["none", "trivial", "randaug", "autoaug_cifar"])
     p.add_argument("--cutout", type=int, default=0, help="square size in pixels, 0 = off")
+    p.add_argument("--extra-aug", action="store_true",
+                   help="experimental affine+color aug; B3 pilot rejected it (-1.0 clean val)")
     p.add_argument("--mixup-alpha", type=float, default=0)
     p.add_argument("--cutmix-alpha", type=float, default=0)
     p.add_argument("--mix-prob", type=float, default=1.0, help="chance to mix each batch")
@@ -170,7 +172,7 @@ def main():
         torch.backends.cudnn.benchmark = True     # images are all the same size
     train_loader, val_loader = get_loaders(args.batch_size, args.val_size, args.workers,
                                            args.autoaug, args.cutout, args.gpu_aug, device,
-                                           args.aug_chunk)
+                                           args.aug_chunk, args.extra_aug)
 
     raw_model = build_model(config).to(device)
     n_params = count_params(raw_model)

@@ -40,6 +40,7 @@ numbers: `STATUS.md`.
 - Smoke: `python train.py --epochs 1 --warmup 1 --limit-batches 5 --workers 0 --out runs/B_smoke`
 - Baseline: `python train.py --epochs 200 --workers 10 --save-every 5 --out runs/A_baseline`
 - All tricks (team recipe): add `--autoaug trivial --cutout 16 --mixup-alpha 0.2 --cutmix-alpha 1.0 --mix-off-epochs 15 --sam --ema-decay 0.999 --epochs 300`
+- `--extra-aug` is experimental (affine + color); the B3 pilot rejected it (−1.0 clean val, no shifted gain). Do not merge it to main.
 - KD: add `--teachers t1.pt t2.pt --kd-alpha 0.9 --kd-temp 4 --epochs 600`; teachers must use the same `--val-size`. Label smoothing is auto-disabled when teachers are present.
 - Teacher: `--arch wrn_28_10 --no-budget --epochs 400 ... --seed 0` (or `pyramid_110_270`, no SAM). Use a different seed per teacher.
 - Teacher architecture preset: `pyramid_110_270` is 28.5M; `wrn_28_10` is 36.5M. Both need `--no-budget`.
