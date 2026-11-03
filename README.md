@@ -158,8 +158,14 @@ crop + flip, label smoothing 0.1, SGD + Nesterov, warmup + cosine LR, 200 epochs
 - `--kd-temp` [4]: temperature.
 
 **Augmentation**
-- `--autoaug` [`none`]: one of `none`, `trivial`, `randaug`, `autoaug_cifar`.
+- `--autoaug` [`none`]: one of `none`, `trivial`, `randaug`, `autoaug_cifar`, `augmix`.
+  `augmix` is torchvision AugMix, severity 3, mixture width 3, **one view, no JSD loss**
+  (B3 winner: shift proxy +3.1pp, clean unchanged; see STATUS.md).
 - `--cutout SIZE` [0 = off]: one black square per image.
+- `--geo-aug`: mild affine (translate/scale/rotate). B3: −0.5 clean for +0.6 shifted,
+  not adopted by default.
+- `--extra-aug`: strong affine + color jitter. B3: −1.0 clean, no shifted gain —
+  experimental, do not use for real runs.
 - `--gpu-aug`: augment whole batches on the GPU instead of in CPU workers.
 - `--aug-chunk` [16]: with `--gpu-aug`, how many images share one autoaug draw.
 
@@ -324,6 +330,10 @@ Always put the run name and val accuracy in the submission message.
 | kd_r3_64_2t_600 | r3_64_3-5-3 | 4.92M | 600 | KD 2 teachers + all tricks | 97.76 | 0.904 |
 | student_tricks_300 | r3_64_3-5-3 | 4.92M | 300 | all tricks, no KD | 97.36 (EMA+TTA) | - |
 | student_baseline | r3_64_3-5-3 | 4.92M | 200 | crop + flip + label smoothing | 94.76 (95.42 TTA) | - |
+| B_augmix_300_sam | r3_64_3-5-3 | 4.92M | 300 | all tricks + `--autoaug augmix` | 97.06 (97.04 EMA+TTA) | - |
+| B_trivial_300_sam | r3_64_3-5-3 | 4.92M | 300 | all tricks (team recipe) | running | - |
+| B_pilot_augmix | r3_64_3-5-3 | 4.92M | 150 | augmix, no SAM, no KD | 96.52 (TTA) | - |
+| B_pilot_trivial | r3_64_3-5-3 | 4.92M | 150 | trivial, no SAM, no KD | 96.48 (TTA) | - |
 | teacher_wrn_s1 | WRN-28-10 | 36.5M | 400 | teacher | 98.14 | - |
 | teacher_wrn_s0 | WRN-28-10 | 36.5M | 400 | teacher | 98.08 | - |
 | teacher_pyr_s2 | PyramidNet-110 | 28.5M | 400 | teacher | 97.66 | - |
@@ -350,15 +360,21 @@ noise), so never pick models by small public-LB differences.
 
 ### Track B (partner, RTX 5000 + own HPC hours)
 
-- [ ] **B1:** characterize the test shift: per-channel mean/std, sharpness, noise. Look at
-      the images, but don't label them.
-- [ ] **B2:** build a "shifted val" by corrupting our 5k val split (noise, blur, JPEG,
+- [x] **B1:** characterize the test shift: per-channel mean/std, sharpness, noise. Look at
+      the images, but don't label them. → new natural photos, not corrupted CIFAR;
+      0/2000 exact matches. `runs/analysis/shift.md`.
+- [x] **B2:** build a "shifted val" by corrupting our 5k val split (noise, blur, JPEG,
       contrast, color). Report clean + shifted val for every run.
-- [ ] **B3:** robustness augmentation ablations at 150-200 epochs, no KD: AugMix + JSD,
-      stronger RandAugment, noise/blur/JPEG aug, stronger CutMix. Pick by shifted val, as
-      long as clean val drops < 0.3.
-- [ ] **B4:** add the winner as a flag in the same style as the other tricks, on a branch.
+      → `scripts/shift_analysis.py --checkpoints runs/B_.../last.pt`.
+- [x] **B3:** robustness augmentation ablations at 150-200 epochs, no KD. Pick by shifted
+      val, as long as clean val drops < 0.3.
+      → **AugMix wins**: 87.42 vs 84.32 combo, clean 96.52 vs 96.48. RandAugment,
+      AutoAugment-CIFAR, `--geo-aug`, `--extra-aug` all rejected.
+- [x] **B4:** add the winner as a flag in the same style as the other tricks, on a branch.
+      → `--autoaug augmix` on `b_shift`; 300 ep + SAM gives **97.06 val, 89.02 combo**.
 - [ ] **B5:** test it on top of KD (3 teachers, 300 epochs).
+      → **blocked**: needs `teacher_wrn_s0/s1` and `teacher_pyr_s2` checkpoints in this
+      repo's format. Our old `../proj1` checkpoints do not load.
 
 ## 12. Team conventions
 

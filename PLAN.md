@@ -1,6 +1,6 @@
 # Team plan and work trajectory
 
-Updated 2026-11-02. This is the durable memory for the collaboration. `AGENTS.md`
+Updated 2026-11-03. This is the durable memory for the collaboration. `AGENTS.md`
 has the commands; `STATUS.md` has the current numbers.
 
 ## Context
@@ -48,27 +48,25 @@ corruption gallery: `runs/analysis/corruption_gallery.png`.
 
 ## Track B next steps (ours)
 
-1. **Port B1/B2 to this repo.** B1 is data-only (`data.load_train`, `load_test`).
-   B2 needs fresh checkpoints from this repo (old checkpoints won't load). Build a
-   shifted val from the seed-0 5k split with natural-photo corruptions and a
-   `B_...` run table.
-2. **B3 — natural-photo augmentation ablations** on `r3_64_3-5-3`, no KD, 150–200
-   epochs so runs are cheap. Compare:
-   - `--autoaug randaug` vs `trivial` vs `autoaug_cifar`
-   - `--cutmix-alpha 1.0 --mixup-alpha 0.4 --mix-prob 1.0` vs `0.5`
-   - `--cutout 8` and combinations
-   - new transforms (scale/translation/rotation/color) added as flags
-   Select by clean val + shifted val, with a clean-val drop ≤0.3.
-   Note: the README's B2/B3 list suggests noise/blur/JPEG; our visual B1 says the
-   eval is new natural photos. Prioritize natural-photo variants and share the
-   montage with Track A before committing to corruption augmentations.
-   **Pilot result (2026-11-02):** AugMix (`--autoaug augmix`, one view) is the
-   winner: clean TTA 96.52 vs control 96.48, combo shifted 87.42 vs 84.32 (+3.10).
-   Geometry-only trades 0.50 clean for +0.64 shifted; RandAugment, AutoAugment-CIFAR,
-   and the additive affine+color variant all lost. Next: 300 epochs + SAM AugMix,
-   then B5 KD once Track A's teachers arrive.
-3. **B4 — merge the winner as a flag** in this repo and tell Track A.
+Updated 2026-11-03: B1–B4 are done; B5 is blocked on teacher checkpoints.
+
+1. ~~Port B1/B2 to this repo.~~ **Done:** `scripts/shift_analysis.py` (B1 stats +
+   montage, B2 corrupted seed-0 5k holdout). Report `runs/analysis/shift.md`.
+2. ~~B3 — natural-photo augmentation ablations.~~ **Done (150 ep, no SAM):** AugMix
+   (`--autoaug augmix`, one view) wins: clean TTA 96.52 vs 96.48 control, combo
+   shifted 87.42 vs 84.32 (+3.10). Geometry-only trades 0.50 clean for +0.64
+   shifted; RandAugment, AutoAugment-CIFAR and `--extra-aug` all lost.
+3. ~~B4 — merge the winner as a flag.~~ **Done:** `--autoaug augmix` (plus
+   `--geo-aug`, `--extra-aug`) on `b_shift`. The 300-epoch + SAM recipe
+   (`B_augmix_300_sam`) gives **97.06 val / 97.04 EMA+TTA, 89.02 combo** vs 84.32
+   for the control — clean +0.8, shift gap 11.96pp → 8.08pp. 4.92M params.
+   Control run `B_trivial_300_sam` (team "all tricks", no AugMix) is running to
+   separate the AugMix gain from the longer schedule.
 4. **B5 — one 3-teacher KD run with the winning augmentation** vs without.
+   **Blocked:** needs `teacher_wrn_s0/s1` + `teacher_pyr_s2` in this repo's
+   `config`+`ema` format. Do not train a 36.5M teacher on Modal — A5 covers that on
+   the A100s. Meanwhile the cheap proxy is KD from whichever student is best, but a
+   teacher at ~97 val cannot teach a 97.06 student much.
 
 ## Track A (teammate, for context)
 

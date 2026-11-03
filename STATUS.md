@@ -1,36 +1,43 @@
-# Shared repo status — 2026-11-02
+# Shared repo status — 2026-11-03
 
 ## TL;DR
 
-- **This is now the shared team repo** (`b_shift` branch). Old code/artifacts are
+- **This is the shared team repo** (`b_shift` branch). Old code/artifacts are
   archived in `../proj1/our_code_backup/`.
-- Data pipeline works: `data/train_cache.npz` (50k) + `data/test_images` (2k);
-  `train.py` → `scripts/summarize.py` → `predict.py` smoke test passed
-  (`runs/B_smoke`).
 - **Team best: 0.904 public** (teammate, 2-teacher KD, 97.76 val). Our best from the
-  old repo: **0.864** (96.50 val ensemble).
+  old repo: 0.864 (96.50 val ensemble, now not eligible).
 - README rules: the final submission is **one ≤5M network — no ensembles**; teachers
-  may be any size (`--no-budget`). The 0.864 ensemble is reference only, not a valid
-  final model.
+  may be any size (`--no-budget`). The 0.864 ensemble is reference only.
 - Eval is **new natural photographs** (CIFAR-10.1-like), not corrupted CIFAR. See
   `runs/analysis/shift.md`; prioritize natural-photo robustness, not noise/blur/JPEG.
-- Next: B3 natural-photo augmentation ablations on `r3_64_3-5-3`; no submissions
-  used today.
+- **B3 done: AugMix wins** the shifted-val sweep (+3.10pp, clean unchanged).
+  **B4 done: 300 epochs + SAM + AugMix = 97.06 val** (97.08 EMA, 97.04 EMA+TTA),
+  shifted proxy 89.02 vs 84.32 control — our best single ≤5M model so far.
+- Running now: `B_trivial_300_sam`, the same recipe with `--autoaug trivial` (the
+  team's "all tricks"), so B4's gain can be separated from "300 epochs + SAM".
+- **B5 (KD + AugMix) is blocked**: no compatible teacher checkpoints yet. Old
+  `../proj1` checkpoints do not load in this repo (no `config`/`ema`, other arch names).
 
-## Results
+## Results (seed-0 5k split, this repo unless noted)
 
-| Model | Val | Public | Notes |
+| Model | Val % | Public | Notes |
 |---|---|---|---|
-| teammate "all tricks" | 97.36 | ~0.90 | 5M student |
-| teammate 2-teacher KD | **97.76** | **0.904** | current team best |
-| old repo: w40-robust + WRN-22-4 | 96.50 | 0.864 | old code, incompatible checkpoints |
+| teammate "all tricks" | 97.36 | ~0.90 | 5M student, 300 ep + SAM |
+| teammate 2-teacher KD | **97.76** | **0.904** | current team best, 600 ep |
+| **B_augmix_300_sam** | **97.06** (97.04 EMA+TTA) | — | 4.92M, all tricks + AugMix |
+| B_pilot_augmix | 96.52 (TTA) | — | 150 ep, no SAM, AugMix only |
+| B_pilot_trivial | 96.48 (TTA) | — | 150 ep, no SAM, control |
+| B_pilot_geo | 95.98 (TTA) | — | mild affine, rejected |
+| B_pilot_randaug | 96.50 (TTA) | — | rejected |
+| B_pilot_autoaug | 96.62 (TTA) | — | autoaug_cifar, rejected |
+| B_pilot_extra | 95.46 (TTA) | — | strong affine+color, rejected |
+| old repo: w40-robust + WRN-22-4 | 96.50 | 0.864 | ensemble, not eligible |
 | old repo: single-teacher KD | 96.24 | — | WRN-40-4 teacher |
-| old repo: WRN-22-4 AugMix | 96.00 | — | |
 | old repo: WRN-40-4 teacher | 96.60 | — | 8.98M, not submittable |
 
-Val numbers are not directly comparable across repos/splits; this repo uses the
-seed-0 5k split. The old 0.864 row is an ensemble and is **not eligible as the final
-model** under the README rule (one ≤5M network, no ensembles).
+Val numbers are not directly comparable across repos; this repo uses the seed-0 5k
+split. `B_augmix_300_sam` is 0.3 below the teammate's "all tricks" on clean val but
+is the more robust of the two on every shifted proxy we measure.
 
 ## Shift analysis (B1/B2)
 
@@ -40,7 +47,7 @@ model** under the README rule (one ≤5M network, no ensembles).
 - Synthetic `combo` corruption matches the *size* of the drop (~9.1pp), not the
   mechanism. Do not optimize primarily on noise/blur/JPEG.
 
-## B3 results (2026-11-02, 150 epochs, no SAM, seed 0)
+## B3 pilot (150 epochs, no SAM, no KD, seed 0)
 
 | Run | Clean TTA | Combo shifted |
 |---|---|---|
@@ -56,35 +63,58 @@ model** under the README rule (one ≤5M network, no ensembles).
 - Rejected: `--extra-aug`, `randaug`, `autoaug_cifar`. Geometry-only trades 0.50
   clean for +0.64 shifted; not adopted under the clean-drop ≤0.3 rule.
 - `--autoaug augmix` is one-view AugMix (no JSD), implemented in `data.py`.
-- Full table: `runs/analysis/B_shift.md`.
-- Running: **300 epochs + SAM + AugMix** (`B_augmix_300_sam`) as the B4 candidate.
+
+## B4 result: 300 epochs + SAM + AugMix
+
+`B_augmix_300_sam` (4,918,602 params, 300 ep, all tricks, `--autoaug augmix`) vs the
+150-epoch `trivial` control. EMA weights, **no TTA**, seed-0 5k holdout:
+
+| corruption | B_pilot_trivial (150 ep) | B_augmix_300_sam | delta |
+|---|---|---|---|
+| clean | 96.28 | **97.10** | +0.82 |
+| combo (shift proxy) | 84.32 | **89.02** | **+4.70** |
+| noise 0.05 | 78.20 | 85.22 | +7.02 |
+| noise 0.10 | 40.78 | 52.98 | +12.20 |
+| blur 1.0 | 74.08 | 79.34 | +5.26 |
+| blur 2.0 | 16.78 | 14.70 | −2.08 |
+| jpeg 30 | 67.58 | 78.04 | +10.46 |
+| contrast 0.7 / 1.3 | 95.94 / 95.94 | 96.92 / 96.76 | +0.98 / +0.82 |
+| color 1.3 | 96.16 | 97.02 | +0.86 |
+
+- Shift gap on the proxy narrows from 11.96pp to 8.08pp; clean acc also improves.
+- Only regression is heavy blur (2.0) — irrelevant to the eval, which is *sharper*
+  than CIFAR. Do not tune for it.
+- `results.json`: `val_acc 0.9706`, `val_acc_ema 0.9708`, `val_acc_ema_tta 0.9704`.
+- Report: `runs/analysis/B4/B_shift.md` (script output, not tracked — numbers are
+  copied above because `runs/` is gitignored).
 
 ## Repo state
 
-- Branch: `b_shift`; README pulled and merged (`b3cbec6`). Docs updated after the
-  README; commit when reviewed.
-- Data: `data` symlink → `../proj1/data`, including the 147MB
-  `train_cache.npz` generated from the official CIFAR-10 batches. This matches the
-  README's `hpc_data.zip` cache; `train_labels.csv` is absent but not needed while
-  the cache exists.
+- Branch: `b_shift`; B3 flag + docs committed. Working tree clean apart from `runs/`.
+- Data: `data` symlink → `../proj1/data`, including the 147MB `train_cache.npz`
+  generated from the official CIFAR-10 batches (matches the README's `hpc_data.zip`).
 - `opencode.json` has the local Kaggle MCP token; excluded via `.git/info/exclude`.
-- `runs/B_smoke` is the 2-batch smoke test (not a real model).
-- No HPC or Modal jobs running.
+- `runs/` is gitignored: keep results in this file / README, not only on disk.
+- Modal: app `cifar-shared`, function `run_task(task, args)`, volumes `proj1-data`
+  (`/data`) and `proj1-runs` (`/runs`). A10G, ~19 s/epoch for a 5M student at 300 ep.
+  `scripts/shift_analysis.py --tta` is parsed but unused — its tables are always
+  no-TTA.
 
 ## Next steps
 
-1. Review/commit `AGENTS.md`, `PLAN.md`, `STATUS.md` on `b_shift`.
-2. Port B1/B2 to this repo's `data.py`/`models.py` and seed-0 split.
-3. B3 complete: **AugMix wins** (+3.1 shifted, clean unchanged); `--autoaug augmix` is in the repo.
-4. B4: evaluate the 300-epoch + SAM AugMix run; if clean is ~97.3 and shifted is
-   strong, add it to the README results table and consider it for the final single
-   model (no ensemble).
-5. B5: KD with AugMix once Track A's teacher checkpoints arrive.
-6. Keep submissions for clear val/shifted-val wins; final pick is one ≤5M network.
+1. `B_trivial_300_sam` (running) — is the B4 gain AugMix or just "300 ep + SAM"?
+   Evaluate it with `scripts/shift_analysis.py --checkpoints` on clean + combo.
+2. B5 (KD + AugMix): blocked on teacher checkpoints; ask Track A for
+   `teacher_wrn_s0.pt` / `teacher_pyr_s2.pt` in this repo's checkpoint format.
+   Do not train our own 36.5M teacher on Modal — the team's A100 budget already
+   covers A5.
+3. Submission: none used today. `B_augmix_300_sam` is the first candidate worth a
+   submission, once the trivial control confirms AugMix is the reason.
 
 ## Open questions for the teammate
 
-- Teacher checkpoints and the exact "all tricks" flags for the 97.76 run.
+- Teacher checkpoints (`teacher_wrn_s0/s1`, `teacher_pyr_s2`) in this repo's
+  `config`+`ema` format — B5 needs them.
 - Which branch/commits are current for Track A?
-- Is `summarize.py` the canonical results table, and are run names `A_...`/`B_...`?
-- Does our `train_cache.npz` match `hpc_data.zip`?
+- Does the measured clean-val gap (our 97.06 vs their 97.36 "all tricks") come from
+  their 300-ep recipe, or from the architecture/seed?
