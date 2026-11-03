@@ -13,13 +13,13 @@ numbers: `STATUS.md`.
 - The eval is **new natural photos**, not corrupted CIFAR-10. See
   `runs/analysis/shift.md`. Prioritize natural-photo robustness (AugMix/RandAugment,
   CutMix/MixUp, scale/translation/rotation, color/lighting) over noise/blur/JPEG.
-- **Our best single ≤5M model: `B_augmix_300_sam`** — 97.06 val (97.04 EMA+TTA),
-  shifted proxy 89.02 vs 84.32 for the control, 300 ep + SAM + `--autoaug augmix`.
-  AugMix was the B3 sweep winner; `--autoaug trivial` control is `B_trivial_300_sam`.
-- **B5 (KD on top of AugMix) is downstream of A5, which is downstream of B4**:
-  A5 (robust teachers) has not started and cannot until B4 is signed off, and B5
-  needs A5's teachers. Old `../proj1` checkpoints are incompatible, and training a
-  36.5M teacher on Modal would duplicate A5 — so B5 is a Nov 4+ item.
+- **B4 is signed off (2026-11-03).** At 300 ep + SAM, AugMix is clean-neutral
+  against the team's `trivial` recipe (EMA 97.08 for both) and **+2.18pp on the combo
+  shifted proxy** (89.02 vs 86.84). The pilot's larger gain came from 300 ep + SAM,
+  not the augmentation — ablate augmentation at the schedule you intend to ship.
+- **B5 (KD on top of AugMix) is downstream of A5**: A5 is unblocked by B4 and should
+  train its teachers with `--autoaug augmix`. Old `../proj1` checkpoints are
+  incompatible, and training a 36.5M teacher on Modal would duplicate A5.
 - Team conventions: seed-0 5k split, `A_...`/`B_...` run names, 5 submissions/day
   (2 ours, 2 theirs, 1 spare). The final submission must be **one ≤5M network — no
   ensembles**; keep 2 candidate single models chosen by val + shifted val, not public LB.
@@ -47,7 +47,7 @@ numbers: `STATUS.md`.
 - Smoke: `python train.py --epochs 1 --warmup 1 --limit-batches 5 --workers 0 --out runs/B_smoke`
 - Baseline: `python train.py --epochs 200 --workers 10 --save-every 5 --out runs/A_baseline`
 - All tricks (team recipe): add `--autoaug trivial --cutout 16 --mixup-alpha 0.2 --cutmix-alpha 1.0 --mix-off-epochs 15 --sam --ema-decay 0.999 --epochs 300`
-- AugMix (B3 winner): `--autoaug augmix` (one view; no JSD). In the 300-ep + SAM recipe it gives 97.06 val and 89.02 combo vs 84.32 for `trivial` `B_pilot` control. Prefer this over `trivial` for robustness experiments.
+- AugMix (B3 winner, B4 signed off): `--autoaug augmix` (one view; no JSD). At 300 ep + SAM it is clean-neutral vs `trivial` (EMA 97.08 both) and +2.18pp on the combo shifted proxy (89.02 vs 86.84); +12.9pp at noise 0.10. Prefer it for robustness work, and use it for A5's teachers.
 - `--extra-aug` is experimental (affine + color); the B3 pilot rejected it (−1.0 clean val, no shifted gain). Do not merge it to main.
 - `--geo-aug` is mild affine only; B3 showed −0.5 clean for +0.6 shifted; not adopted.
 - KD: add `--teachers t1.pt t2.pt --kd-alpha 0.9 --kd-temp 4 --epochs 600`; teachers must use the same `--val-size`. Label smoothing is auto-disabled when teachers are present.

@@ -56,12 +56,12 @@ Updated 2026-11-03: B1–B4 are done; B5 is blocked on teacher checkpoints.
    (`--autoaug augmix`, one view) wins: clean TTA 96.52 vs 96.48 control, combo
    shifted 87.42 vs 84.32 (+3.10). Geometry-only trades 0.50 clean for +0.64
    shifted; RandAugment, AutoAugment-CIFAR and `--extra-aug` all lost.
-3. ~~B4 — merge the winner as a flag.~~ **Done:** `--autoaug augmix` (plus
-   `--geo-aug`, `--extra-aug`) on `b_shift`. The 300-epoch + SAM recipe
-   (`B_augmix_300_sam`) gives **97.06 val / 97.04 EMA+TTA, 89.02 combo** vs 84.32
-   for the control — clean +0.8, shift gap 11.96pp → 8.08pp. 4.92M params.
-   Control run `B_trivial_300_sam` (team "all tricks", no AugMix) is running to
-   separate the AugMix gain from the longer schedule.
+3. ~~B4 — merge the winner as a flag.~~ **Done and signed off:** `--autoaug augmix`
+   (plus `--geo-aug`, `--extra-aug`) on `b_shift`. At 300 ep + SAM, AugMix is
+   clean-neutral (EMA 97.08 for both runs, TTA 97.04 vs 97.22) and **+2.18pp on the
+   combo shifted proxy** (89.02 vs 86.84), +12.9pp at noise 0.10. The pilot's bigger
+   gain was 300 ep + SAM, not AugMix — ablate at the schedule you intend to ship.
+   A5 can start: train the robust teachers with `--autoaug augmix`.
 4. **B5 — one 3-teacher KD run with the winning augmentation** vs without.
    **Dependency chain: B4 close-out → A5 (robust teachers) → B5.** A5 has not
    started because it waits on B4, and B5 needs A5's teachers (`teacher_*_augmix`,

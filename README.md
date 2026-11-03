@@ -330,8 +330,8 @@ Always put the run name and val accuracy in the submission message.
 | kd_r3_64_2t_600 | r3_64_3-5-3 | 4.92M | 600 | KD 2 teachers + all tricks | 97.76 | 0.904 |
 | student_tricks_300 | r3_64_3-5-3 | 4.92M | 300 | all tricks, no KD | 97.36 (EMA+TTA) | - |
 | student_baseline | r3_64_3-5-3 | 4.92M | 200 | crop + flip + label smoothing | 94.76 (95.42 TTA) | - |
-| B_augmix_300_sam | r3_64_3-5-3 | 4.92M | 300 | all tricks + `--autoaug augmix` | 97.06 (97.04 EMA+TTA) | - |
-| B_trivial_300_sam | r3_64_3-5-3 | 4.92M | 300 | all tricks (team recipe) | running | - |
+| B_augmix_300_sam | r3_64_3-5-3 | 4.92M | 300 | all tricks + `--autoaug augmix` | 97.08 (97.04 EMA+TTA) | - |
+| B_trivial_300_sam | r3_64_3-5-3 | 4.92M | 300 | all tricks (team recipe) | 97.08 (97.22 EMA+TTA) | - |
 | B_pilot_augmix | r3_64_3-5-3 | 4.92M | 150 | augmix, no SAM, no KD | 96.52 (TTA) | - |
 | B_pilot_trivial | r3_64_3-5-3 | 4.92M | 150 | trivial, no SAM, no KD | 96.48 (TTA) | - |
 | teacher_wrn_s1 | WRN-28-10 | 36.5M | 400 | teacher | 98.14 | - |
@@ -340,6 +340,11 @@ Always put the run name and val accuracy in the submission message.
 
 Pending: `kd_r3_64_3t_600` (3 teachers) and the architecture sweep `runs/sweep_kd3t_300_*`.
 Run `python scripts/summarize.py` for the latest.
+
+**Track B (B4):** at 300 ep + SAM, `trivial` and `augmix` are clean-identical (97.08 EMA)
+and AugMix is +2.18pp on the combo shifted proxy (89.02 vs 86.84). The larger gain in
+the 150-ep pilot was 300 ep + SAM, not the augmentation — run augmentation ablations at
+the schedule you intend to ship.
 
 **Key finding:** the hidden test set is distribution-shifted. Models score 7-11 points lower
 on Kaggle than on our val split (our KD student: 97.76 val -> 0.904 public), and stronger
@@ -371,7 +376,9 @@ noise), so never pick models by small public-LB differences.
       → **AugMix wins**: 87.42 vs 84.32 combo, clean 96.52 vs 96.48. RandAugment,
       AutoAugment-CIFAR, `--geo-aug`, `--extra-aug` all rejected.
 - [x] **B4:** add the winner as a flag in the same style as the other tricks, on a branch.
-      → `--autoaug augmix` on `b_shift`; 300 ep + SAM gives **97.06 val, 89.02 combo**.
+      → `--autoaug augmix` on `b_shift`. **B4 signed off:** at 300 ep + SAM (seed 0)
+      AugMix is clean-neutral (EMA 97.08 for both runs) and +2.18pp on the combo
+      shifted proxy (89.02 vs 86.84 for the team recipe), +12.9pp at noise 0.10.
 - [ ] **B5:** test it on top of KD (3 teachers, 300 epochs).
       → **blocked**: needs `teacher_wrn_s0/s1` and `teacher_pyr_s2` checkpoints in this
       repo's format. Our old `../proj1` checkpoints do not load.

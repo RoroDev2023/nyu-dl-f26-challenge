@@ -10,12 +10,13 @@
   may be any size (`--no-budget`). The 0.864 ensemble is reference only.
 - Eval is **new natural photographs** (CIFAR-10.1-like), not corrupted CIFAR. See
   `runs/analysis/shift.md`; prioritize natural-photo robustness, not noise/blur/JPEG.
-- **B3 done: AugMix wins** the shifted-val sweep (+3.10pp, clean unchanged).
-  **B4 done: 300 epochs + SAM + AugMix = 97.06 val** (97.08 EMA, 97.04 EMA+TTA),
-  shifted proxy 89.02 vs 84.32 control — our best single ≤5M model so far.
-- Running now: `B_trivial_300_sam`, the same recipe with `--autoaug trivial` (the
-  team's "all tricks"), so B4's gain can be separated from "300 epochs + SAM".
-  **B4 close-out is the critical path** — A5 (robust teachers) is waiting on it.
+- **B3 done: AugMix wins** the shifted-val sweep (pilot: +3.10pp, clean unchanged).
+- **B4 done and signed off.** At 300 ep + SAM, AugMix is clean-neutral (EMA 97.08 for
+  both) and **+2.18pp on the shifted proxy** (89.02 vs 86.84 for the team's `trivial`
+  recipe). The larger jump seen in the pilot came from 300 ep + SAM, not AugMix — do
+  augmentation ablations at the schedule you intend to ship.
+- Nothing is running. **B4 → A5 (robust teachers) → B5 (KD)** unblocked: A5 should
+  train its teachers with `--autoaug augmix`.
 - **B5 (KD + AugMix) is downstream of A5, which is downstream of B4.** No teacher
   checkpoints exist yet, and old `../proj1` ones do not load (no `config`/`ema`,
   different arch names).
@@ -26,7 +27,8 @@
 |---|---|---|---|
 | teammate "all tricks" | 97.36 | ~0.90 | 5M student, 300 ep + SAM |
 | teammate 2-teacher KD | **97.76** | **0.904** | current team best, 600 ep |
-| **B_augmix_300_sam** | **97.06** (97.04 EMA+TTA) | — | 4.92M, all tricks + AugMix |
+| **B_augmix_300_sam** | 97.08 (97.04 EMA+TTA) | — | 4.92M, all tricks + AugMix |
+| **B_trivial_300_sam** | **97.08** (97.22 EMA+TTA) | — | 4.92M, team recipe control |
 | B_pilot_augmix | 96.52 (TTA) | — | 150 ep, no SAM, AugMix only |
 | B_pilot_trivial | 96.48 (TTA) | — | 150 ep, no SAM, control |
 | B_pilot_geo | 95.98 (TTA) | — | mild affine, rejected |
@@ -38,8 +40,8 @@
 | old repo: WRN-40-4 teacher | 96.60 | — | 8.98M, not submittable |
 
 Val numbers are not directly comparable across repos; this repo uses the seed-0 5k
-split. `B_augmix_300_sam` is 0.3 below the teammate's "all tricks" on clean val but
-is the more robust of the two on every shifted proxy we measure.
+split. Our two 300-ep runs are clean-identical (97.08 EMA both) and 0.3 below the
+teammate's "all tricks"; AugMix's gain is entirely on the shifted proxy (+2.18pp).
 
 ## Shift analysis (B1/B2)
 
@@ -66,29 +68,44 @@ is the more robust of the two on every shifted proxy we measure.
   clean for +0.64 shifted; not adopted under the clean-drop ≤0.3 rule.
 - `--autoaug augmix` is one-view AugMix (no JSD), implemented in `data.py`.
 
-## B4 result: 300 epochs + SAM + AugMix
+## B4 result: 300 epochs + SAM, AugMix vs trivial (both 300 ep, seed 0)
 
-`B_augmix_300_sam` (4,918,602 params, 300 ep, all tricks, `--autoaug augmix`) vs the
-150-epoch `trivial` control. EMA weights, **no TTA**, seed-0 5k holdout:
+Both runs are `r3_64_3-5-3` (4,918,602 params), 300 ep, all tricks + SAM + EMA 0.999.
+`results.json`:
 
-| corruption | B_pilot_trivial (150 ep) | B_augmix_300_sam | delta |
+| run | `--autoaug` | val | TTA | EMA | EMA+TTA |
+|---|---|---|---|---|---|
+| B_augmix_300_sam | `augmix` | 97.06 | 97.02 | 97.08 | 97.04 |
+| B_trivial_300_sam | `trivial` (team recipe) | 96.98 | **97.20** | 97.08 | **97.22** |
+
+Shifted proxy, EMA weights, **no TTA**, seed-0 5k holdout (`runs/analysis/B4_300`):
+
+| corruption | trivial | augmix | augmix − trivial |
 |---|---|---|---|
-| clean | 96.28 | **97.10** | +0.82 |
-| combo (shift proxy) | 84.32 | **89.02** | **+4.70** |
-| noise 0.05 | 78.20 | 85.22 | +7.02 |
-| noise 0.10 | 40.78 | 52.98 | +12.20 |
-| blur 1.0 | 74.08 | 79.34 | +5.26 |
-| blur 2.0 | 16.78 | 14.70 | −2.08 |
-| jpeg 30 | 67.58 | 78.04 | +10.46 |
-| contrast 0.7 / 1.3 | 95.94 / 95.94 | 96.92 / 96.76 | +0.98 / +0.82 |
-| color 1.3 | 96.16 | 97.02 | +0.86 |
+| clean | 97.08 | 97.10 | +0.02 |
+| combo (shift proxy) | 86.84 | **89.02** | **+2.18** |
+| noise 0.05 | 80.92 | 85.22 | +4.30 |
+| noise 0.10 | 40.10 | 52.98 | **+12.88** |
+| jpeg 30 | 72.88 | 78.04 | +5.16 |
+| blur 1.0 | 79.88 | 79.34 | −0.54 |
+| blur 2.0 | 15.84 | 14.70 | −1.14 |
+| contrast 0.7 | 97.00 | 96.92 | −0.08 |
+| contrast 1.3 | 96.70 | 96.76 | +0.06 |
+| color 1.3 | 96.80 | 97.02 | +0.22 |
 
-- Shift gap on the proxy narrows from 11.96pp to 8.08pp; clean acc also improves.
-- Only regression is heavy blur (2.0) — irrelevant to the eval, which is *sharper*
-  than CIFAR. Do not tune for it.
-- `results.json`: `val_acc 0.9706`, `val_acc_ema 0.9708`, `val_acc_ema_tta 0.9704`.
-- Report: `runs/analysis/B4/B_shift.md` (script output, not tracked — numbers are
-  copied above because `runs/` is gitignored).
+**Verdict: B4 stands, but smaller than the pilot implied.** On clean val the two are
+identical (EMA 97.08 both; TTA favours `trivial` by 0.18, i.e. ~9 of 5000 images).
+The genuine AugMix contribution is **+2.18pp on the natural-photo proxy** and a much
+larger margin under noise/JPEG (+12.9pp at noise 0.10, +5.2pp at JPEG 30).
+
+**Correction to the earlier claim:** the 150-ep → 300-ep comparison (+4.70 combo,
++0.82 clean) mostly measured **300 epochs + SAM**, not AugMix — the 300-ep `trivial`
+control also jumped (84.32 → 86.84 combo, 96.28 → 97.08 clean). Only the two 300-ep
+runs above isolate the augmentation. Lesson for future ablations: compare augmentation
+at the schedule you intend to ship, not at a cheap one.
+
+TTA note: TTA adds +0.14 to `trivial` but −0.04 to `augmix`, the same pattern Track A
+saw on their KD student. Treat TTA as noise-level for these models.
 
 ## Repo state
 
@@ -102,35 +119,32 @@ is the more robust of the two on every shifted proxy we measure.
   `scripts/shift_analysis.py --tta` is parsed but unused — its tables are always
   no-TTA.
 
-## Next steps — B4 close-out is the critical path
+## Next steps
 
-Dependency chain: **B4 (us) → A5 (robust teachers) → B5 (KD + AugMix)**. A5 has not
-started because it waits on B4, and B5 needs A5's teachers, so nothing downstream
-moves until B4 is signed off. Do not buy that time back by training a 36.5M teacher
-on Modal: that duplicates A5 (which runs on the team's A100 credit) and yields one
-teacher instead of three.
+Dependency chain: **B4 (done) → A5 (robust teachers) → B5 (KD + AugMix)**. A5 is
+unblocked: it should train its teachers with `--autoaug augmix` and share them in this
+repo's `config`+`ema` format. Do not train a 36.5M teacher on Modal to shortcut that —
+it duplicates A5 on paid credit and yields one teacher instead of three.
 
-What "B4 done" needs:
-
-1. `B_trivial_300_sam` (running, ~20 s/epoch, finishes ≈23:40 EST) — same 300-ep +
-   SAM recipe with `--autoaug trivial`. This is the control that attributes the B4
-   gain to AugMix rather than to the longer schedule.
-2. Shift-eval it into its own dir so the comparison stays side by side:
-   `python scripts/shift_analysis.py --checkpoints runs/B_trivial_300_sam/last.pt --out-dir runs/analysis/B4_trivial`
-3. Put the head-to-head in STATUS/README, commit, and tell Track A the flag and the
-   recipe (`--autoaug augmix`, 300 ep + SAM, 97.06 val / 89.02 shifted) so A5 can
-   start immediately with AugMix teachers.
-4. Then the next question is the final single model, not another augmentation: a
-   second AugMix seed (~1.75 h, ~$2) for seed variance, since the final pick is one
-   ≤5M network and a lucky seed is real risk at ±0.15 val.
-
-Submission: none used today. `B_augmix_300_sam` is the first candidate worth a
-submission, once step 1/2 confirm AugMix is the reason.
+1. **Hand off to Track A.** Tell Rahim B4 is signed off: flag merged (`--autoaug
+   augmix`), clean-neutral, +2.18pp shifted, +12.9pp at noise 0.10. Ask for the teacher
+   checkpoints once A5 finishes.
+2. **Seed variance (ours, next spend ~$2).** Our number is a single seed. A second
+   AugMix seed at 300 ep (~1.75 h) tells us whether 97.08 / 89.02 is the model or a
+   lucky draw, and gives a second candidate for our 2 submission slots. Recommended
+   before any submission, since the final model is a single ≤5M network.
+3. **B5** once A5's teachers land: 3-teacher KD on this AugMix recipe vs the same
+   without AugMix, 300 ep, scored on clean + shifted.
+4. **Submission:** none used today. Candidates are `B_augmix_300_sam` (robustness:
+   +2.18 combo) and `B_trivial_300_sam` (clean EMA+TTA 97.22 vs 97.04). Pick by val +
+   shifted val, state both in the submission message.
 
 ## Open questions for the teammate
 
 - Teacher checkpoints (`teacher_wrn_s0/s1`, `teacher_pyr_s2`) in this repo's
-  `config`+`ema` format — B5 needs them.
+  `config`+`ema` format — B5 needs them; A5 should use `--autoaug augmix`.
 - Which branch/commits are current for Track A?
-- Does the measured clean-val gap (our 97.06 vs their 97.36 "all tricks") come from
-  their 300-ep recipe, or from the architecture/seed?
+- Their "all tricks" is 97.36 clean vs our 96.98-97.08 for the same recipe: is that
+  the architecture, the seed, or something in their recipe we are missing?
+- Our 300-ep control (97.22 EMA+TTA) is worth re-checking against their 97.36 — if
+  the gap is real and not seed luck, something in their "all tricks" is unaccounted for.
