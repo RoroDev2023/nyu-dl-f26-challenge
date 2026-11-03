@@ -63,6 +63,7 @@ def get_autoaug(name):
         "trivial": v2.TrivialAugmentWide(),
         "randaug": v2.RandAugment(),
         "autoaug_cifar": v2.AutoAugment(v2.AutoAugmentPolicy.CIFAR10),
+        "augmix": v2.AugMix(severity=3, mixture_width=3),
     }[name]
 
 
@@ -88,7 +89,7 @@ class Cutout:
         return cutout(img[None], self.size)[0]
 
 
-def build_train_tf(autoaug="none", cutout_size=0, extra_aug=False):
+def build_train_tf(autoaug="none", cutout_size=0, extra_aug=False, geo_aug=False):
     # training: random shift (pad 4px then crop back to 32) + random flip
     steps = [
         v2.ToImage(),                                   # numpy HWC -> tensor CHW
@@ -98,11 +99,16 @@ def build_train_tf(autoaug="none", cutout_size=0, extra_aug=False):
     if autoaug != "none":
         steps.append(get_autoaug(autoaug))
     if extra_aug:
-        # natural-photo robustness: mild geometry + lighting/color changes
+        # rejected in B3: too strong on top of TrivialAugment
         steps += [
             v2.RandomAffine(degrees=15, translate=(0.1, 0.1), scale=(0.9, 1.1)),
             v2.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05),
         ]
+    if geo_aug:
+        # mild geometry only (B3 candidate)
+        steps.append(
+            v2.RandomAffine(degrees=10, translate=(0.05, 0.05), scale=(0.95, 1.05))
+        )
     steps += [
         v2.ToDtype(torch.float32, scale=True),          # 0..255 -> 0..1
         v2.Normalize(MEAN, STD),
@@ -180,12 +186,12 @@ class GPUTrainLoader:
 
 
 def get_loaders(batch_size=128, val_size=5000, num_workers=4, autoaug="none", cutout_size=0,
-                gpu_aug=False, device=None, aug_chunk=16, extra_aug=False):
+                gpu_aug=False, device=None, aug_chunk=16, extra_aug=False, geo_aug=False):
     """val_loader is None when val_size == 0 (final run on all 50k).
     The split seed stays fixed on purpose: every student and teacher, whatever its --seed,
     must hold out the same images, or teachers would have trained on the student's val."""
-    if gpu_aug and extra_aug:
-        raise ValueError("--extra-aug is not supported with --gpu-aug")
+    if gpu_aug and (extra_aug or geo_aug):
+        raise ValueError("--extra-aug/--geo-aug are not supported with --gpu-aug")
     x, y = load_train()
     xtr, ytr, xva, yva = train_val_split(x, y, val_size)
     if gpu_aug:
@@ -194,7 +200,7 @@ def get_loaders(batch_size=128, val_size=5000, num_workers=4, autoaug="none", cu
     else:
         # no persistent workers: fresh workers get their seeds from the main process every
         # epoch, which is what lets a resumed run continue with the same random numbers
-        train_loader = DataLoader(CIFARDataset(xtr, ytr, build_train_tf(autoaug, cutout_size, extra_aug)),
+        train_loader = DataLoader(CIFARDataset(xtr, ytr, build_train_tf(autoaug, cutout_size, extra_aug, geo_aug)),
                                   batch_size=batch_size, shuffle=True, num_workers=num_workers,
                                   drop_last=True, pin_memory=torch.cuda.is_available())
     val_loader = None

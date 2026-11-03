@@ -10,7 +10,8 @@ import pandas as pd
 # flag -> value that means "off". Anything else is listed in the "tricks" column.
 BASELINE = {"teachers": [], "autoaug": "none", "cutout": 0, "mixup_alpha": 0, "cutmix_alpha": 0,
             "sam": False, "asam": False, "ema_decay": 0, "se": False, "drop_path": 0,
-            "dropout": 0, "val_size": 5000, "no_budget": False, "extra_aug": False}
+            "dropout": 0, "val_size": 5000, "no_budget": False, "extra_aug": False,
+            "geo_aug": False}
 
 
 def tricks(args):

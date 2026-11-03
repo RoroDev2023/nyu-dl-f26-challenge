@@ -40,17 +40,24 @@ model** under the README rule (one ≤5M network, no ensembles).
 - Synthetic `combo` corruption matches the *size* of the drop (~9.1pp), not the
   mechanism. Do not optimize primarily on noise/blur/JPEG.
 
-## B3 pilot (2026-11-02)
+## B3 results (2026-11-02, 150 epochs, no SAM, seed 0)
 
-- Control (team aug base, 150 epochs, no SAM): **96.28 EMA / 96.48 TTA** clean;
-  combo shifted 84.32.
-- `--extra-aug` (affine 15° + translate 0.1 + scale 0.9–1.1 + color jitter):
-  95.20 / 95.46 clean; combo 84.38.
-- **Rejected**: −1.0pp clean, no shifted gain. Do not merge `--extra-aug` to main;
-  the base TrivialAugment + cutout + CutMix recipe is already strong.
+| Run | Clean TTA | Combo shifted |
+|---|---|---|
+| control: `trivial` | 96.48 | 84.32 |
+| `--geo-aug` (mild affine) | 95.98 | 84.96 |
+| `--autoaug randaug` | 96.50 | 83.70 |
+| `--autoaug autoaug_cifar` | 96.62 | 83.14 |
+| `--extra-aug` (strong affine+color) | 95.46 | 84.38 |
+| **`--autoaug augmix`** | **96.52** | **87.42** |
+
+- **AugMix is the clear B3 winner**: clean TTA unchanged (+0.04), shifted proxy
+  **+3.10pp**; also much better on noise/blur/JPEG.
+- Rejected: `--extra-aug`, `randaug`, `autoaug_cifar`. Geometry-only trades 0.50
+  clean for +0.64 shifted; not adopted under the clean-drop ≤0.3 rule.
+- `--autoaug augmix` is one-view AugMix (no JSD), implemented in `data.py`.
 - Full table: `runs/analysis/B_shift.md`.
-- Next B3 candidates if needed: a **milder geometry-only** variant, or replacing
-  `trivial` with `randaug`/`autoaug_cifar` (not adding on top).
+- Running: **300 epochs + SAM + AugMix** (`B_augmix_300_sam`) as the B4 candidate.
 
 ## Repo state
 
@@ -68,11 +75,12 @@ model** under the README rule (one ≤5M network, no ensembles).
 
 1. Review/commit `AGENTS.md`, `PLAN.md`, `STATUS.md` on `b_shift`.
 2. Port B1/B2 to this repo's `data.py`/`models.py` and seed-0 split.
-3. B3 natural-photo ablations on `r3_64_3-5-3`, based on the team all-tricks recipe
-   (`--autoaug trivial --cutout 16 --mixup-alpha 0.2 --cutmix-alpha 1.0
-   --mix-off-epochs 15 --sam --ema-decay 0.999`); log runs as `B_...`.
-4. B4 merge winning flag; B5 KD check with Track A's 3 teachers.
-5. Keep submissions for clear val/shifted-val wins; final pick is one ≤5M network.
+3. B3 complete: **AugMix wins** (+3.1 shifted, clean unchanged); `--autoaug augmix` is in the repo.
+4. B4: evaluate the 300-epoch + SAM AugMix run; if clean is ~97.3 and shifted is
+   strong, add it to the README results table and consider it for the final single
+   model (no ensemble).
+5. B5: KD with AugMix once Track A's teacher checkpoints arrive.
+6. Keep submissions for clear val/shifted-val wins; final pick is one ≤5M network.
 
 ## Open questions for the teammate
 
