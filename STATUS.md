@@ -46,10 +46,43 @@ teammate's "all tricks"; AugMix's gain is entirely on the shifted proxy (+2.18pp
 ## Shift analysis (B1/B2)
 
 - `runs/analysis/shift.md`, `shift_montage.png`, `corruption_gallery.png`.
-- 0/2,000 exact CIFAR-10 matches; brighter, higher contrast/sharpness, lower
-  blockiness (not JPEG); visually new photos with different framing/background/scale.
+- Verifier: `scripts/verify_shift_b1.py` → `runs/analysis/verify_shift.json`.
+- 0/2,000 exact CIFAR-10 matches; visually new photos with different
+  framing/background/scale (the montage is decisive: full-frame dogs, a bus, a horse
+  and rider — not CIFAR's small objects in context).
 - Synthetic `combo` corruption matches the *size* of the drop (~9.1pp), not the
   mechanism. Do not optimize primarily on noise/blur/JPEG.
+
+### B1 evidence check (2026-11-03)
+
+Rewritten after re-deriving it from scratch; the original reading leaned on statistics
+that do not support the weight they carried.
+
+- **Photometric deltas are real but tiny** (50k train vs 2k eval, Cohen's d):
+  sharpness +0.0053 (d 0.27), contrast +0.0101 (0.17), brightness +0.0173 (0.14),
+  blockiness −0.0009 (−0.07), hf_ratio +0.0029 (0.06), colorfulness n.s. (p=0.07).
+  New photographs from the same classes would differ this much from composition
+  alone, so "the stats show the eval is cleaner / not re-JPEG'd" is **not** evidence.
+- **The nearest-neighbour tests are the evidence.** eval vs all 50k train, against a
+  genuine-CIFAR reference (held-out val vs train) matched identically:
+
+  | matching | genuine pairs (median / p1) | eval→train (median / p1) | eval below genuine p1 |
+  |---|---|---|---|
+  | dihedral (8 symmetries) | 1852 / 313 | 1982 / 675 | 0.0% |
+  | 5 shifts + 8×8 pool | 73.5 / 9.3 | 79.9 / 22.4 | 0.0% |
+
+  Eval images are at least as far from every CIFAR image as unrelated CIFAR images
+  are. A brightness/contrast transform, re-JPEG, flip/rotation or shift-and-crop of a
+  CIFAR image would collapse that residual toward zero; none does. So the eval is
+  **different content, not transformed CIFAR-10** — which also closes the "same
+  photos, different save pipeline" possibility.
+- **Consequence for B2:** the corruption branch is closed, and matching the *size* of
+  the accuracy drop is not evidence of mechanism. The inherited line "the corruption
+  with a drop closest to the Kaggle gap is the best proxy" (old `shift.md`) is wrong.
+  Corruption numbers stay as a stress test / regression guard only; augmentation
+  choices are made on clean val plus the natural-photo prior, and validated by the LB.
+- Residual risk: the NN test cannot rule out eval images derived from the CIFAR-10
+  **test** split (we do not have it) or a non-rigid transform. Low, but unverified.
 
 ## B3 pilot (150 epochs, no SAM, no KD, seed 0)
 

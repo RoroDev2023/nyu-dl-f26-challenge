@@ -60,6 +60,13 @@ numbers: `STATUS.md`.
   → clean + 9 corruptions on the seed-0 5k split, EMA weights, **no TTA** (`--tta`
   is parsed but unused, and it rewrites `B_shift.md`/`.json`/montage in `--out-dir`,
   so give each comparison its own directory).
+- Shift verifier: `python scripts/verify_shift_b1.py` (~7 min) → proves the eval is
+  different content, not transformed CIFAR (dihedral + translation-tolerant nearest
+  neighbour against 50k train, with a genuine-CIFAR reference), plus effect sizes for
+  the photometric deltas. Run it before quoting B1 numbers; the raw stats alone are
+  too weak (Cohen's d ≤ 0.27) to argue a different imaging pipeline.
+  **Corruption accuracy is a stress test, never a selection criterion** — matching a
+  drop's magnitude says nothing about its mechanism.
 - Modal (when local GPU time is not enough): `modal deploy modal_shared.py`, then
   `modal.Function.from_name("cifar-shared", "run_task").spawn("train", [...])`.
   Volumes `proj1-data`→`/data`, `proj1-runs`→`/runs`; A10G, ~19 s/epoch for a 5M

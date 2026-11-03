@@ -367,7 +367,9 @@ noise), so never pick models by small public-LB differences.
 
 - [x] **B1:** characterize the test shift: per-channel mean/std, sharpness, noise. Look at
       the images, but don't label them. → new natural photos, not corrupted CIFAR;
-      0/2000 exact matches. `runs/analysis/shift.md`.
+      0/2000 exact matches. `runs/analysis/shift.md`, verified by
+      `scripts/verify_shift_b1.py` (nearest-neighbour test rules out pixel/geometric
+      transforms of CIFAR; the photometric deltas are too small to be evidence).
 - [x] **B2:** build a "shifted val" by corrupting our 5k val split (noise, blur, JPEG,
       contrast, color). Report clean + shifted val for every run.
       → `scripts/shift_analysis.py --checkpoints runs/B_.../last.pt`.
