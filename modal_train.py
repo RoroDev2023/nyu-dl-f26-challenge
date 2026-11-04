@@ -2,7 +2,9 @@
 README.md. train.py, data.py and models.py run unchanged: in the container data/, teachers/
 and runs/ are links into two Volumes, so their usual relative paths just work.
 
-    modal run --detach modal_train.py --gpu A100-40GB --args "--out runs/X ..."
+    modal deploy modal_train.py      # then launch with scripts/modal_launch.py (survives
+                                     # the laptop going offline, unlike modal run --detach)
+    modal run modal_train.py --gpu A100-40GB --args "--out runs/X ..."    # attached, quick tests
     modal run modal_train.py::predict_entry --checkpoint runs/X/last.pt --out runs/X/submission.csv
 """
 import os
