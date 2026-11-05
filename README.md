@@ -406,8 +406,10 @@ noise), so never pick models by small public-LB differences.
       AugMix is clean-neutral (EMA 97.08 for both runs) and +2.18pp on the combo
       shifted proxy (89.02 vs 86.84 for the team recipe), +12.9pp at noise 0.10.
 - [ ] **B5:** test it on top of KD (3 teachers, 300 epochs).
-      → **blocked**: needs `teacher_wrn_s0/s1` and `teacher_pyr_s2` checkpoints in this
-      repo's format. Our old `../proj1` checkpoints do not load.
+      → running 2026-11-05: `B_kd3t_trivial` vs `B_kd3t_augmix` on `r3_80_2-3-3`,
+      3 teachers, 300 ep, seed 0. Modal hit its billing limit at epoch ~163, so both
+      resume from the epoch-160 checkpoint (augmix on the local 4060; the control still
+      needs a slot). Numbers: `STATUS.md`.
 
 ## 12. Team conventions
 
