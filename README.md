@@ -12,7 +12,11 @@ Our approach:
 
 ## 2. Competition rules we must follow
 
-- The final submission is **one** network with <= 5M trainable params. No ensemble as the final model.
+- The submitted network has <= 5M trainable params. Teams convention: **one model, no
+  ensemble** — the official text (`overview.md`) states the budget for "a modified
+  ResNet" and never mentions ensembles, so this is our conservative reading, not a
+  quoted rule. Measured: a 2-seed ensemble gains +0.34 on the composite shifted proxy
+  (p=0.15), i.e. inside public-LB noise.
 - No pretrained weights, no external data.
 - Teachers (any size) must be trained from scratch by us, on the same train data.
 - Hidden test images are for inference only: no pseudo-labels, no test-time BN adaptation.

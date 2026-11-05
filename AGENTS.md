@@ -17,12 +17,19 @@ numbers: `STATUS.md`.
   against the team's `trivial` recipe (EMA 97.08 for both) and **+2.18pp on the combo
   shifted proxy** (89.02 vs 86.84). The pilot's larger gain came from 300 ep + SAM,
   not the augmentation — ablate augmentation at the schedule you intend to ship.
-- **B5 (KD on top of AugMix) is downstream of A5**: A5 is unblocked by B4 and should
-  train its teachers with `--autoaug augmix`. Old `../proj1` checkpoints are
-  incompatible, and training a 36.5M teacher on Modal would duplicate A5.
+- **B5 is running (2026-11-05)**: 3-teacher KD (`r3_80_2-3-3`, 300 ep) with
+  `--autoaug trivial` vs `--autoaug augmix`, seed 0, arms `B_kd3t_trivial` /
+  `B_kd3t_augmix`. Teachers came from Rahim and all used `val_size=5000`.
+- **Deadline: midnight 2026-11-06.** `EXPERIMENTS.md` is the run-by-run backbone for
+  the report; `REPORT_DRAFT.md` holds the method/setup draft.
 - Team conventions: seed-0 5k split, `A_...`/`B_...` run names, 5 submissions/day
-  (2 ours, 2 theirs, 1 spare). The final submission must be **one ≤5M network — no
-  ensembles**; keep 2 candidate single models chosen by val + shifted val, not public LB.
+  (2 ours, 2 theirs, 1 spare).
+- **Rules**: the official text (`../proj1/overview.md`) states the 5M budget for "a
+  modified ResNet" and is **silent about ensembles** — "no ensembles" is a team
+  convention, not a staff rule. We still submit a single model: a 2-seed ensemble
+  measured +0.34 on the composite proxy (p=0.15), inside public-LB noise. Teachers at
+  28.5M/36.5M are only defensible if the budget constrains the submitted student; that
+  reading is unresolved and flagged in the report draft.
 - Teachers may be any size (trained from scratch on the same train data); use
   `--no-budget`. Only the submitted student must be ≤5M.
 
@@ -60,6 +67,15 @@ numbers: `STATUS.md`.
   → clean + 9 corruptions on the seed-0 5k split, EMA weights, **no TTA** (`--tta`
   is parsed but unused, and it rewrites `B_shift.md`/`.json`/montage in `--out-dir`,
   so give each comparison its own directory).
+- Environment check against Rahim's artifacts (repo root: `KEEP/`, `ckpts/`,
+  `teachers/`, `submissions/`, all gitignored):
+  `python scripts/tta_eval.py cache KEEP/F2s1.pt probs/F2s1_test.npz --split test`
+  then `python scripts/tta_eval.py submit probs/F2s1_test.npz out.csv --check KEEP/submission_F2s1_tta5.csv`
+  -> must report 0 differences. `KEEP/` is the 0.911 model: never overwrite it.
+- B5 launch (Modal, teachers at `/data/teachers/`): `r3_80_2-3-3`, 300 ep, SAM + EMA,
+  `--teachers /data/teachers/teacher_wrn_s0.pt /data/teachers/teacher_wrn_s1.pt /data/teachers/teacher_pyr_s2.pt`,
+  `--kd-alpha 0.9 --kd-temp 4`, and `--autoaug trivial` vs `--autoaug augmix`.
+  ~59 s/epoch with 3 teachers on an A10.
 - Shift verifier: `python scripts/verify_shift_b1.py` (~7 min) → proves the eval is
   different content, not transformed CIFAR (dihedral + translation-tolerant nearest
   neighbour against 50k train, with a genuine-CIFAR reference), plus effect sizes for
@@ -88,8 +104,8 @@ numbers: `STATUS.md`.
   checkpoints and shift reports stay on disk only — copy every new number into
   `STATUS.md`/README, not just into `runs/analysis/`.
 - The 5M assert is in `train.py`/`predict.py`; `--no-budget` is only for teachers.
-- The final submission is **one ≤5M network; ensembles are not allowed as the final
-  model**. Use `predict.py` with a single checkpoint.
+- The final submission is **one ≤5M network** (team convention; the official text is
+  silent on ensembles). Use `predict.py` with a single checkpoint.
 - Our archived code and older analysis live in `../proj1/our_code_backup/`; the
   shift report is copied to `runs/analysis/`.
 

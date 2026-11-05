@@ -1,25 +1,28 @@
-# Shared repo status — 2026-11-03
+# Shared repo status — 2026-11-05
 
 ## TL;DR
 
 - **This is the shared team repo** (`b_shift` branch). Old code/artifacts are
   archived in `../proj1/our_code_backup/`.
-- **Team best: 0.904 public** (teammate, 2-teacher KD, 97.76 val). Our best from the
-  old repo: 0.864 (96.50 val ensemble, now not eligible).
-- README rules: the final submission is **one ≤5M network — no ensembles**; teachers
-  may be any size (`--no-budget`). The 0.864 ensemble is reference only.
-- Eval is **new natural photographs** (CIFAR-10.1-like), not corrupted CIFAR. See
-  `runs/analysis/shift.md`; prioritize natural-photo robustness, not noise/blur/JPEG.
-- **B3 done: AugMix wins** the shifted-val sweep (pilot: +3.10pp, clean unchanged).
-- **B4 done and signed off.** At 300 ep + SAM, AugMix is clean-neutral (EMA 97.08 for
-  both) and **+2.18pp on the shifted proxy** (89.02 vs 86.84 for the team's `trivial`
-  recipe). The larger jump seen in the pilot came from 300 ep + SAM, not AugMix — do
-  augmentation ablations at the schedule you intend to ship.
-- Nothing is running. **B4 → A5 (robust teachers) → B5 (KD)** unblocked: A5 should
-  train its teachers with `--autoaug augmix`.
-- **B5 (KD + AugMix) is downstream of A5, which is downstream of B4.** No teacher
-  checkpoints exist yet, and old `../proj1` ones do not load (no `config`/`ema`,
-  different arch names).
+- **Team best: 0.911 public** (`KEEP/F2s1.pt`, 1200 ep, full data, 5-crop TTA),
+  holdout equivalent A4 97.84 / 97.92 (5-crop). Our old-repo best: 0.864.
+- **Deadline: midnight 2026-11-06.** `EXPERIMENTS.md` is the run-by-run backbone.
+- On the rules: the official text (`../proj1/overview.md`) says the 5M budget applies
+  to "a modified ResNet" and **never mentions ensembles** — the "no ensembles" line is
+  the team README's convention, not staff's. We do not rely on ensembles anyway: a
+  two-seed AugMix ensemble measured +0.34 on the composite proxy (p=0.15), inside the
+  ±1.1pp public noise.
+- Eval is **new natural photographs**, not corrupted CIFAR — verified by a
+  nearest-neighbour test (`scripts/verify_shift_b1.py`), not by the photometric stats.
+- **B4 done and signed off**, now with paired statistics: AugMix is clean-neutral
+  (97.08 EMA both arms, p=0.46) and **+2.18pp on the composite proxy** (p=3.6e-9),
+  +4.1 noise, +5.3 JPEG, +1.1-1.4 on photographic jitter (p≈1e-5). Stable across two
+  seeds (+2.18, +1.80).
+- **B5 is running now** (unblocked: Rahim shared the 3 teachers, all with `val_size=5000`).
+  Two arms, `r3_80_2-3-3`, 300 ep, 3 teachers, SAM+EMA, KL α=0.9 T=4: `--autoaug trivial`
+  vs `--autoaug augmix`, seed 0. ~59 s/epoch → ~4.9 h each, in parallel.
+- Reproduced his best submission from our checkout: `scripts/tta_eval.py submit` gives
+  **0 differences** against `KEEP/submission_F2s1_tta5.csv`.
 
 ## Results (seed-0 5k split, this repo unless noted)
 
@@ -142,42 +145,60 @@ saw on their KD student. Treat TTA as noise-level for these models.
 
 ## Repo state
 
-- Branch: `b_shift`; B3 flag + docs committed. Working tree clean apart from `runs/`.
-- Data: `data` symlink → `../proj1/data`, including the 147MB `train_cache.npz`
-  generated from the official CIFAR-10 batches (matches the README's `hpc_data.zip`).
-- `opencode.json` has the local Kaggle MCP token; excluded via `.git/info/exclude`.
+- Branch: `b_shift`, now merged with Rahim's `main` (EXPERIMENTS.md, TTA module, LS-KD,
+  ASAM fix, cyclic/SWA, Modal launcher). Push needed so Track A can use `--autoaug augmix`.
+- Data: `data` symlink → `../proj1/data`, including the 147MB `train_cache.npz`.
+- **Shared big files** (gitignored, from Rahim's Drive zip, repo root):
+  `KEEP/` (F2s1.pt = 0.911 model + its csv — do not overwrite), `ckpts/` (A4.pt 97.92
+  with 5-crop, kd2t.pt 0.904), `teachers/` (wrn_s0 98.06, wrn_s1 98.12, pyr_s2 97.64),
+  `submissions/` (every submitted csv).
+- Environment check, reproduced from his checkout:
+  `python scripts/tta_eval.py cache KEEP/F2s1.pt probs/F2s1_test.npz --split test` then
+  `python scripts/tta_eval.py submit probs/F2s1_test.npz out.csv --check KEEP/submission_F2s1_tta5.csv`
+  → **0 differences** (data, code and TTA are identical to his).
 - `runs/` is gitignored: keep results in this file / README, not only on disk.
 - Modal: app `cifar-shared`, function `run_task(task, args)`, volumes `proj1-data`
-  (`/data`) and `proj1-runs` (`/runs`). A10G, ~19 s/epoch for a 5M student at 300 ep.
+  (`/data`, teachers uploaded to `/data/teachers`) and `proj1-runs` (`/runs`). A10G:
+  ~19-21 s/epoch for a 5M student, ~59 s/epoch for 3-teacher KD.
   `scripts/shift_analysis.py --tta` is parsed but unused — its tables are always
   no-TTA.
 
-## Next steps
+## B5 (running, 2026-11-05)
 
-Dependency chain: **B4 (done) → A5 (robust teachers) → B5 (KD + AugMix)**. A5 is
-unblocked: it should train its teachers with `--autoaug augmix` and share them in this
-repo's `config`+`ema` format. Do not train a 36.5M teacher on Modal to shortcut that —
-it duplicates A5 on paid credit and yields one teacher instead of three.
+Rahim's 3 teachers landed and all have `val_size=5000`, so there is no teacher-on-val
+leak. Two matched arms, student `r3_80_2-3-3` (4.88M, his best sweep shape, 97.62 at
+300 ep), 300 epochs, 3 teachers (`wrn_s0` + `wrn_s1` + `pyr_s2`), KL alpha=0.9 T=4,
+TrivialAug/Cutout16/mixup/CutMix, SAM rho=0.05, EMA 0.999, seed 0:
 
-1. **Hand off to Track A.** Tell Rahim B4 is signed off: flag merged (`--autoaug
-   augmix`), clean-neutral, +2.18pp shifted, +12.9pp at noise 0.10. Ask for the teacher
-   checkpoints once A5 finishes.
-2. **Seed variance (ours, next spend ~$2).** Our number is a single seed. A second
-   AugMix seed at 300 ep (~1.75 h) tells us whether 97.08 / 89.02 is the model or a
-   lucky draw, and gives a second candidate for our 2 submission slots. Recommended
-   before any submission, since the final model is a single ≤5M network.
-3. **B5** once A5's teachers land: 3-teacher KD on this AugMix recipe vs the same
-   without AugMix, 300 ep, scored on clean + shifted.
-4. **Submission:** none used today. Candidates are `B_augmix_300_sam` (robustness:
-   +2.18 combo) and `B_trivial_300_sam` (clean EMA+TTA 97.22 vs 97.04). Pick by val +
-   shifted val, state both in the submission message.
+| run | change vs control | status |
+|---|---|---|
+| `B_kd3t_trivial` | control: `--autoaug trivial` | running |
+| `B_kd3t_augmix` | `--autoaug augmix` | running |
+
+~4.9 h each, run in parallel; a listener downloads both and evaluates clean + the
+proxies with paired McNemar, using `ckpts/A4.pt` (600 ep, trivial) as reference.
+
+## Next steps (deadline: midnight 2026-11-06)
+
+1. **B5 result -> hand off.** If AugMix holds on top of KD, A6 (full data, 1200 ep,
+   `--val-size 0`) should use `--autoaug augmix`; the flag is on `b_shift`. His
+   acceptance rule for A4-level claims: beat the matched control *and* A4 on the full
+   val under 5-crop, paired, raw+EMA agreeing, then repeat from another seed.
+2. **Submission slot (ours).** Current in-repo candidates are `B_augmix_300_sam`
+   (clean 97.08 EMA, combo 89.02) and `B_trivial_300_sam` (97.08 EMA / 97.22 TTA,
+   combo 86.84); the KD arms should beat both if the recipe transfers. State val +
+   shifted val in the submission message.
+3. **Report.** Method/setup draft in `REPORT_DRAFT.md`; Rahim owns results+discussion.
+4. **Rules**: no ensemble, no eval-label use; the 5M-vs-teacher reading is still an
+   open question for staff and is flagged in the report draft.
 
 ## Open questions for the teammate
 
-- Teacher checkpoints (`teacher_wrn_s0/s1`, `teacher_pyr_s2`) in this repo's
-  `config`+`ema` format — B5 needs them; A5 should use `--autoaug augmix`.
-- Which branch/commits are current for Track A?
-- Their "all tricks" is 97.36 clean vs our 96.98-97.08 for the same recipe: is that
-  the architecture, the seed, or something in their recipe we are missing?
-- Our 300-ep control (97.22 EMA+TTA) is worth re-checking against their 97.36 — if
-  the gap is real and not seed luck, something in their "all tricks" is unaccounted for.
+- Does the 5M budget constrain teachers, or only the submitted student? (Flagged in
+  `REPORT_DRAFT.md` section 1; our teachers are 28.5M/36.5M.)
+- Does A4 (600 ep, `trivial`) count as the matched control for a 300-epoch AugMix arm,
+  or does he want a 600-epoch AugMix arm too?
+- Timing for A6: if it starts before B5 finishes, does he train with `trivial` and
+  re-run, or wait ~5 h for our answer?
+- `opencode.json` holds the local Kaggle MCP token and is excluded via
+  `.git/info/exclude`; never commit or print it.
