@@ -32,11 +32,14 @@ Our approach:
 | `scripts/summarize.py` | Collects every `runs/*/results.json` into one sorted table |
 | `run.sbatch` | Slurm job script: 1 A100, runs `python train.py <your flags>` |
 | `submit.sh` | Wrapper around `sbatch` for the HPC Jupyter session (see section 8) |
+| `modal_train.py` | Runs `train.py` / `predict.py` on Modal cloud GPUs (see section 8b) |
+| `scripts/modal_upload.sh` | One-time upload of data + teachers to the Modal volume |
+| `scripts/modal_launch.py` | Starts a training job on the deployed Modal app; status / logs / cancel of a call |
 | `check_data.py` | Sanity check: loads train/test data and saves `check_data.png` with sample images |
 | `check_loader.py` | Sanity check: shows an augmented training batch (`check_loader.png`) |
 | `check_model.py` | Prints the param count of every student and teacher preset |
 
-Not in git (see `.gitignore`): `data/`, `runs/`, `logs/`, checkpoints (`*.pt`), zips,
+Not in git (see `.gitignore`): `data/`, `runs/`, `logs/`, `teachers/`, checkpoints (`*.pt`), zips,
 images, `submission*.csv`.
 
 ## 4. Data setup
@@ -300,6 +303,37 @@ A100 timings per epoch:
 | KD student, 2 teachers | ~30 |
 | WRN-28-10 + SAM | 29 |
 | PyramidNet-110-270 | 45 |
+
+## 8b. Running on Modal
+
+[Modal](https://modal.com) runs `train.py` unchanged on a cloud GPU (A100-40GB by default,
+~$2.10/h; H100 ~$3.95/h). `modal_train.py` builds an image with only the repo's `.py` files
+and `scripts/`. Two volumes hold everything else: `resnet5m-data` (`data/`, `teachers/`) and
+`resnet5m-runs` (`runs/`). Inside the container, `data/`, `teachers/` and `runs/` link to them.
+
+```bash
+source .venv-1/bin/activate
+./scripts/modal_upload.sh            # once: data (no train_images) + teachers/*.pt
+modal deploy modal_train.py          # once, and AGAIN after every code change
+
+# train: any train.py flags; --out must be under runs/. Prints a call id (fc-...) and
+# exits; the job keeps running with the laptop closed or offline.
+python scripts/modal_launch.py launch --gpu A100-40GB --args "--out runs/X <flags>"
+
+python scripts/modal_launch.py status fc-...      # running / done / failed
+python scripts/modal_launch.py logs fc-...        # stream its logs (--no-follow: last 200)
+python scripts/modal_launch.py cancel fc-...
+modal volume get resnet5m-runs X ./runs/          # download runs/X (also mid-run)
+modal run modal_train.py::predict_entry --checkpoint runs/X/last.pt --out runs/X/submission.csv
+```
+
+Call ids are also appended to `runs/modal_calls.log`. Don't launch with
+`modal run --detach`: the run still dies when the laptop loses its connection. The job runs
+the code from the last `modal deploy`, not your working copy.
+
+Relaunching with the exact same `--args` resumes from `runs/X/last.pt`. The runs volume is
+committed every 5 minutes and at the end, so if a job is killed (24h timeout, credits run
+out) only the last few minutes of training are lost.
 
 ## 9. Predicting and submitting
 

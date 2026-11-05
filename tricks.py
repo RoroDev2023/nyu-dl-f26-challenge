@@ -68,37 +68,60 @@ def mixed_ce(logits, y_a, y_b, lam, label_smoothing=0.0):
     return loss
 
 
+def standardize(logits):
+    """Z-score each image's logit vector (Sun et al. 2024, logit-standardization-KD):
+    (z - mean) / (std + 1e-7), torch.std as in the reference code."""
+    mean = logits.mean(dim=-1, keepdim=True)
+    std = logits.std(dim=-1, keepdim=True)
+    return (logits - mean) / (1e-7 + std)
+
+
 @torch.no_grad()
-def teacher_probs(teachers, x, temp):
-    """Ensemble teacher: the average of the teachers' softened predictions."""
-    probs = [F.softmax(t(x).float() / temp, dim=1) for t in teachers]
+def teacher_probs(teachers, x, temp, stand=False):
+    """Ensemble teacher: the average of the teachers' softened predictions.
+    stand: z-score each teacher's logits first, then soften, then average."""
+    probs = []
+    for t in teachers:
+        z = t(x).float()
+        probs.append(F.softmax((standardize(z) if stand else z) / temp, dim=1))
     return torch.stack(probs).mean(0)
 
 
-def kd_loss(logits, probs, temp):
+def kd_loss(logits, probs, temp, stand=False):
     """KL(teacher || student) at temperature temp. The temp^2 keeps its gradients on the
-    same scale as the cross entropy (Hinton et al. 2015)."""
-    log_student = F.log_softmax(logits / temp, dim=1)
+    same scale as the cross entropy (Hinton et al. 2015). stand: z-score the student's
+    logits too (the teacher side is done in teacher_probs)."""
+    z = standardize(logits) if stand else logits
+    log_student = F.log_softmax(z / temp, dim=1)
     return F.kl_div(log_student, probs, reduction="batchmean") * temp ** 2
 
 
 @torch.no_grad()
-def sam_perturb(params, rho, adaptive, scale=1.0):
+def sam_perturb(params, rho, adaptive, scale=1.0, eta=0.01, is_weight=None):
     """SAM: move the weights to the nearby worst case, w + e, using the gradients of the
     first pass. Returns the original weights for sam_restore.
     scale undoes GradScaler: with fp16 the gradients are still multiplied by it here.
 
     SAM:  e = rho * g / ||g||
-    ASAM: e = rho * w^2 * g / ||w * g||  (the ball is scaled by the size of each weight)"""
-    params = [p for p in params if p.grad is not None]
+    ASAM: e = rho * T^2 g / ||T g||, T = |w| + eta for params named "*weight*", T = 1 for
+          biases. This is the authors' code (SamsungLabs/ASAM, asam.py ascent_step).
+    is_weight: one bool per param (ASAM only); default treats every param as a weight."""
+    keep = [i for i, p in enumerate(params) if p.grad is not None]
+    params = [params[i] for i in keep]
+    flags = [True] * len(params) if is_weight is None else [is_weight[i] for i in keep]
     grads = [p.grad / scale for p in params]
-    scaled = [p.abs() * g for p, g in zip(params, grads)] if adaptive else grads
-    norm = torch.linalg.vector_norm(torch.stack([torch.linalg.vector_norm(g) for g in scaled]))
+    if adaptive:
+        t = [p.abs() + eta if w else torch.ones_like(p) for p, w in zip(params, flags)]
+        tg = [ti * g for ti, g in zip(t, grads)]
+        steps = [ti * x for ti, x in zip(t, tg)]       # T^2 g
+    else:
+        tg = steps = grads
+    norm = torch.linalg.vector_norm(torch.stack([torch.linalg.vector_norm(g) for g in tg]))
 
     backup = [p.clone() for p in params]
     if torch.isfinite(norm):      # an fp16 overflow gives inf: then skip the perturbation
-        for p, g in zip(params, scaled):
-            p.add_((p.abs() * g if adaptive else g) * rho / (norm + 1e-12))
+        for p, s in zip(params, steps):
+            p.add_(s * rho / (norm + 1e-12))
     return params, backup
 
 
