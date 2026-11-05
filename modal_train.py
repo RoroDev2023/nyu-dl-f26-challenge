@@ -99,6 +99,23 @@ def predict(checkpoint: str, out: str):
     runs_vol.commit()
 
 
+@app.function(image=image, gpu="A100-40GB", cpu=8, memory=32768, timeout=6 * 3600,
+              volumes=VOLUMES)
+def script(args: str):
+    """Run one of scripts/*.py on a GPU, e.g. "scripts/swa_build.py runs/C_swa --out ...".
+    Outputs must go under runs/ to survive."""
+    argv = shlex.split(args)
+    if not (argv and argv[0].startswith("scripts/")):
+        raise SystemExit("first arg must be scripts/<name>.py")
+    link_volumes()
+    try:
+        cmd = [sys.executable, "-u", *argv]
+        print("$", shlex.join(cmd), flush=True)
+        subprocess.run(cmd, check=True)
+    finally:
+        commit_runs()
+
+
 # `modal run modal_train.py::predict_entry --checkpoint ... --out ...` runs predict directly.
 # Not a second local_entrypoint: then plain `modal run modal_train.py` would be ambiguous.
 predict_entry = predict

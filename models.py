@@ -240,6 +240,9 @@ TEACHER_ARCHS = {
     "wrn_16_1":        dict(type="wrn", depth=16, widen=1),
     "pyramid_110_270": dict(type="pyramidnet", depth=110, alpha=270),
     "pyramid_20_24":   dict(type="pyramidnet", depth=20, alpha=24),
+    # not a teacher: ~2.24M, two of them fit the 5M budget together (ensemble experiment).
+    # train.py still asserts <= 5M for it (no --no-budget needed)
+    "wrn_40_2":        dict(type="wrn", depth=40, widen=2),
 }
 
 

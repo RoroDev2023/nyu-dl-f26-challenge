@@ -22,12 +22,12 @@ GPU_COST = {"A100-40GB": 2.10, "H100": 3.95}    # rough $/hour
 CALLS_LOG = os.path.join(os.path.dirname(__file__), "..", "runs", "modal_calls.log")
 
 
-def launch(gpu, args):
+def launch(gpu, args, function=FUNCTION):
     rate = GPU_COST.get(gpu)
     cost = f"~${rate:.2f}/h, 24h timeout = ~${24 * rate:.0f} max" if rate else "cost unknown"
     print(f"GPU: {gpu} ({cost})")
     print(f"train.py {args}")
-    train = modal.Function.from_name(APP, FUNCTION).with_options(gpu=gpu)
+    train = modal.Function.from_name(APP, function).with_options(gpu=gpu)
     call = train.spawn(args=args)
     print(f"spawned: {call.object_id}")
     print(f"  status: python scripts/modal_launch.py status {call.object_id}")
@@ -60,6 +60,8 @@ def main():
     s = sub.add_parser("launch")
     s.add_argument("--gpu", default="A100-40GB", help="A100-40GB or H100")
     s.add_argument("--args", required=True, help="train.py flags, one quoted string")
+    s.add_argument("--script", action="store_true",
+                   help="--args is 'scripts/X.py ...' run by modal_train.script, not train.py")
     for name in ["status", "logs", "cancel"]:
         s = sub.add_parser(name)
         s.add_argument("call_id", help="fc-... as printed by launch")
@@ -68,7 +70,7 @@ def main():
     a = p.parse_args()
 
     if a.cmd == "launch":
-        launch(a.gpu, a.args)
+        launch(a.gpu, a.args, "script" if a.script else FUNCTION)
     elif a.cmd == "status":
         status(a.call_id)
     elif a.cmd == "logs":

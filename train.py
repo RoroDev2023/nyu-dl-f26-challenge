@@ -85,10 +85,12 @@ def evaluate(model, loader, device, tta=False):
     return correct / total
 
 
-def check_resume_args(saved, current):
-    """Refuse to continue a run with different settings: it would silently be another run."""
-    changed = {k: (saved.get(k), v) for k, v in current.items()
-               if k not in RESUME_SAFE_ARGS and saved.get(k) != v}
+def check_resume_args(saved, current, defaults=None):
+    """Refuse to continue a run with different settings: it would silently be another run.
+    A flag added after the run started counts as its default value."""
+    defaults = defaults or {}
+    changed = {k: (saved.get(k, defaults.get(k)), v) for k, v in current.items()
+               if k not in RESUME_SAFE_ARGS and saved.get(k, defaults.get(k)) != v}
     if changed:
         raise SystemExit(f"{current['out']} holds a run with other settings, use a new --out "
                          f"(saved, now): {changed}")
@@ -124,6 +126,11 @@ def main():
     p.add_argument("--teachers", nargs="*", default=[], help="teacher checkpoints")
     p.add_argument("--kd-alpha", type=float, default=0.9)
     p.add_argument("--kd-temp", type=float, default=4)
+    p.add_argument("--kd-mode", default="kl", choices=["kl", "lskd"],
+                   help="lskd: z-score teacher and student logits (Sun et al. 2024). Its loss "
+                        "is --ce-weight * CE + --kd-weight * KL * T^2 (not --kd-alpha)")
+    p.add_argument("--kd-weight", type=float, default=9.0, help="lskd only (authors: 9)")
+    p.add_argument("--ce-weight", type=float, default=0.1, help="lskd only (authors: 0.1)")
     # augmentation
     p.add_argument("--autoaug", default="none",
                    choices=["none", "trivial", "randaug", "autoaug_cifar"])
@@ -139,6 +146,7 @@ def main():
     p.add_argument("--sam-rho", type=float, default=0.05,
                    help="with --asam use a larger rho, the ASAM paper uses 0.5 on CIFAR-10")
     p.add_argument("--asam", action="store_true", help="adaptive SAM (implies --sam)")
+    p.add_argument("--asam-eta", type=float, default=0.01, help="ASAM eta (authors: 0.01)")
     p.add_argument("--ema-decay", type=float, default=0, help="0 = off")
     # architecture options (ResNet students only)
     p.add_argument("--se", action="store_true")
@@ -149,7 +157,17 @@ def main():
     p.add_argument("--compile", action="store_true")
     p.add_argument("--limit-batches", type=int, default=0, help="debug: stop epochs early")
     p.add_argument("--device", default=None, help="default: cuda, else mps, else cpu")
+    p.add_argument("--init-from", default=None, help="start a new run from these weights (EMA if present)")
+    # LR schedule. cyclic (for SWA): --cycle-epochs long cycles, each going linearly from
+    # --lr down to --lr-min; the raw weights at the end of every cycle are saved to
+    # <out>/swa_cycle<k>.pt for scripts/swa_build.py
+    p.add_argument("--lr-schedule", default="cosine", choices=["cosine", "cyclic"])
+    p.add_argument("--cycle-epochs", type=int, default=10)
+    p.add_argument("--lr-min", type=float, default=0.001)
     args = p.parse_args()
+    defaults = vars(p.parse_args([]))
+    if args.lr_schedule == "cyclic" and args.epochs % args.cycle_epochs:
+        p.error("--epochs must be a multiple of --cycle-epochs")
 
     if args.arch in ARCHS:
         config = dict(ARCHS[args.arch], se=args.se, drop_path=args.drop_path,
@@ -173,6 +191,10 @@ def main():
                                            args.aug_chunk)
 
     raw_model = build_model(config).to(device)
+    if args.init_from and not os.path.exists(os.path.join(args.out, "last.pt")):
+        _w, _ = load_model(args.init_from)   # EMA weights if present; source file is only read
+        raw_model.load_state_dict(_w.state_dict())
+        print("initialized from", args.init_from)
     n_params = count_params(raw_model)
     print(f"arch {args.arch}: {n_params:,} params")
     assert args.no_budget or n_params <= 5_000_000, "over the 5M budget!"
@@ -194,6 +216,10 @@ def main():
     # no weight decay on BatchNorm weights/biases (1-D params)
     decay = [p for p in raw_model.parameters() if p.ndim > 1]
     no_decay = [p for p in raw_model.parameters() if p.ndim <= 1]
+    # SAM/ASAM perturb these; ASAM scales by |w| + eta only params named "*weight*"
+    names = {id(p): n for n, p in raw_model.named_parameters()}
+    sam_params = decay + no_decay
+    sam_is_weight = ["weight" in names[id(p)] for p in sam_params]
     optimizer = torch.optim.SGD(
         [{"params": decay, "weight_decay": args.wd},
          {"params": no_decay, "weight_decay": 0.0}],
@@ -207,6 +233,11 @@ def main():
     warmup_steps = args.warmup * steps_per_epoch
 
     def lr_factor(step):
+        if args.lr_schedule == "cyclic":
+            # linear from 1 to lr_min/lr inside each cycle; reaches lr_min on its last step
+            cycle_steps = args.cycle_epochs * steps_per_epoch
+            pos = (step % cycle_steps + 1) / cycle_steps
+            return 1 - pos * (1 - args.lr_min / args.lr)
         if step < warmup_steps:
             return (step + 1) / warmup_steps
         progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
@@ -221,11 +252,21 @@ def main():
     def autocast():
         return torch.autocast(device.type, dtype=amp_dtype, enabled=amp_dtype is not None)
 
+    stand = args.kd_mode == "lskd"
+    if teachers:
+        w_kd, w_ce = ((args.kd_weight, args.ce_weight) if stand
+                      else (args.kd_alpha, 1 - args.kd_alpha))
+        print(f"loss = {w_ce:g} * CE + {w_kd:g} * KL(T={args.kd_temp:g}) * T^2, "
+              f"logit standardization: {stand}")
+
     def compute_loss(logits, y_a, y_b, lam, probs):
+        """Returns (total, weighted CE part, weighted KD part)."""
         hard = mixed_ce(logits, y_a, y_b, lam, label_smoothing)
         if not teachers:
-            return hard
-        return args.kd_alpha * kd_loss(logits, probs, args.kd_temp) + (1 - args.kd_alpha) * hard
+            return hard, hard.detach(), torch.zeros_like(hard)
+        ce_part = w_ce * hard
+        kd_part = w_kd * kd_loss(logits, probs, args.kd_temp, stand)
+        return ce_part + kd_part, ce_part.detach(), kd_part.detach()
 
     # resume if this folder already has a checkpoint
     last_path = os.path.join(args.out, "last.pt")
@@ -236,7 +277,7 @@ def main():
         ckpt = torch.load(last_path, map_location="cpu", weights_only=False)
         if "args" not in ckpt:
             raise SystemExit(f"{last_path} has an old format, use a new --out")
-        check_resume_args(ckpt["args"], vars(args))
+        check_resume_args(ckpt["args"], vars(args), defaults)
         raw_model.load_state_dict(ckpt["model"])
         optimizer.load_state_dict(ckpt["optimizer"])
         scheduler.load_state_dict(ckpt["scheduler"])
@@ -249,14 +290,15 @@ def main():
         print(f"resumed from epoch {start_epoch}")
     else:
         with open(log_path, "w") as f:
-            f.write("epoch,lr,train_loss,train_acc,val_acc,val_acc_ema,seconds,data_seconds\n")
+            f.write("epoch,lr,train_loss,train_acc,val_acc,val_acc_ema,seconds,data_seconds,"
+                    "ce_part,kd_part\n")
 
     for epoch in range(start_epoch + 1, args.epochs + 1):
         model.train()
         t0 = time.time()
         data_secs = 0.0
         # running [sum of loss, sum of correct] stays on the GPU: .item() would sync every step
-        totals = torch.zeros(2, device=device)
+        totals = torch.zeros(4, device=device)    # loss, correct, ce part, kd part
         seen = 0
         mix_on = epoch <= args.epochs - args.mix_off_epochs
         batches = iter(train_loader)
@@ -275,9 +317,9 @@ def main():
 
             with autocast():
                 # teachers see exactly the student's augmented + mixed batch
-                probs = teacher_probs(teachers, x, args.kd_temp) if teachers else None
+                probs = teacher_probs(teachers, x, args.kd_temp, stand) if teachers else None
                 logits = model(x)
-                loss = compute_loss(logits.float(), y_a, y_b, lam, probs)
+                loss, ce_part, kd_part = compute_loss(logits.float(), y_a, y_b, lam, probs)
             optimizer.zero_grad(set_to_none=True)
             scaler.scale(loss).backward()
 
@@ -285,12 +327,12 @@ def main():
                 # second pass at the perturbed weights; its gradients make the real step.
                 # BatchNorm running stats must come from the first pass only. Copying them
                 # back also works with --compile (changing bn.momentum might not).
-                params, backup = sam_perturb(decay + no_decay, args.sam_rho, args.asam,
-                                             scaler.get_scale())
+                params, backup = sam_perturb(sam_params, args.sam_rho, args.asam,
+                                             scaler.get_scale(), args.asam_eta, sam_is_weight)
                 bn_stats = [b.clone() for b in raw_model.buffers()]
                 optimizer.zero_grad(set_to_none=True)
                 with autocast():
-                    loss2 = compute_loss(model(x).float(), y_a, y_b, lam, probs)
+                    loss2 = compute_loss(model(x).float(), y_a, y_b, lam, probs)[0]
                 scaler.scale(loss2).backward()
                 sam_restore(params, backup)
                 for b, saved in zip(raw_model.buffers(), bn_stats):
@@ -304,20 +346,29 @@ def main():
 
             pred = logits.detach().argmax(1)
             correct = lam * (pred == y_a).sum() + (1 - lam) * (pred == y_b).sum()
-            totals += torch.stack([loss.detach().float() * len(y), correct.float()])
+            totals += torch.stack([loss.detach().float() * len(y), correct.float(),
+                                   ce_part.float() * len(y), kd_part.float() * len(y)])
             seen += len(y)
 
         val_acc = evaluate(raw_model, val_loader, device) if val_loader else None
         ema_acc = evaluate(ema.module, val_loader, device) if val_loader and ema else None
         secs = time.time() - t0
         lr = optimizer.param_groups[0]["lr"]
-        loss_avg, acc_avg = (totals / seen).tolist()
-        print(f"epoch {epoch:3d}/{args.epochs}  lr {lr:.4f}  loss {loss_avg:.4f}  "
+        loss_avg, acc_avg, ce_avg, kd_avg = (totals / seen).tolist()
+        print(f"epoch {epoch:3d}/{args.epochs}  lr {lr:.4f}  loss {loss_avg:.4f} "
+              f"(ce {ce_avg:.4f} kd {kd_avg:.4f})  "
               f"train_acc {acc_avg:.4f}  val_acc {fmt(val_acc)}  val_ema {fmt(ema_acc)}  "
               f"({secs:.0f}s, {data_secs:.0f}s waiting for data)", flush=True)
         with open(log_path, "a") as f:
             f.write(f"{epoch},{lr:.6f},{loss_avg:.5f},{acc_avg:.5f},{fmt(val_acc)},{fmt(ema_acc)},"
-                    f"{secs:.1f},{data_secs:.1f}\n")
+                    f"{secs:.1f},{data_secs:.1f},{ce_avg:.5f},{kd_avg:.5f}\n")
+
+        if args.lr_schedule == "cyclic" and epoch % args.cycle_epochs == 0:
+            # raw weights + buffers at the lowest LR of this cycle, for SWA
+            k = epoch // args.cycle_epochs
+            save_atomic({"arch": args.arch, "config": config, "args": vars(args),
+                         "model": raw_model.state_dict(), "epoch": epoch, "ema": None,
+                         "cycle": k}, os.path.join(args.out, f"swa_cycle{k}.pt"))
 
         if epoch % args.save_every == 0 or epoch == args.epochs:
             save_atomic({"arch": args.arch, "config": config, "args": vars(args),
