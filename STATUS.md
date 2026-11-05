@@ -180,11 +180,15 @@ TrivialAug/Cutout16/mixup/CutMix, SAM rho=0.05, EMA 0.999, seed 0:
 after 3 h 20 m, and `finally: volume.commit()` ran, so checkpoints survived at epoch
 160. Modal is now unusable until the cycle resets or credit is added.
 
-Resumed locally on the RTX 4060: **125-158 s/epoch** with all 3 teachers (no OOM), so
-~5-6 h for the remaining 140 epochs. `B_kd3t_augmix` is running from epoch 160
-(val_ema 96.30 at ep 162, LR 0.045 — mid-cosine, not a final number);
-`B_kd3t_trivial` still needs its own ~5 h afterwards, unless it runs on the HPC A100
-(~2.5 h for 300 epochs). Modal needs credit before it can be used again.
+Resumed locally on the RTX 4060 briefly (125 s/epoch, no OOM) and **stopped on request**
+at epoch 178: too much load on a personal laptop. State saved for a proper machine:
+
+- `runs/B_kd3t_augmix` locally: log to epoch 178, `last.pt` at **epoch 160**
+  (`--save-every 20`, so 161-178 would be redone), val_ema 96.36 at ep 178.
+- The **Modal volume still holds the untouched epoch-160 checkpoints** for both arms,
+  with the original `/runs/...` + `/data/teachers/...` args — prefer those for a cloud
+  or HPC resume; the local copy has its `args` rewritten to local paths.
+- Modal needs credit before it can be used again. HPC A100: ~2.5 h per 300-epoch arm.
 
 Two robustness fixes came out of this: `modal_shared.run_task` now commits the runs
 volume every 10 min (Modal can preempt, and a hard kill otherwise loses everything),
