@@ -180,11 +180,11 @@ TrivialAug/Cutout16/mixup/CutMix, SAM rho=0.05, EMA 0.999, seed 0:
 after 3 h 20 m, and `finally: volume.commit()` ran, so checkpoints survived at epoch
 160. Modal is now unusable until the cycle resets or credit is added.
 
-Resumed locally on the RTX 4060: **126 s/epoch** with all 3 teachers (no OOM), so ~4.5 h
-per arm for the remaining 140 epochs. `B_kd3t_augmix` is running now (ETA ~19:45);
-`B_kd3t_trivial` still needs its own 4.5 h afterwards, unless it is run on the HPC A100
-(~2.5 h for 300 epochs). Peak val_ema at the interruption: trivial 95.88, augmix 96.30
-(mid-cosine, LR still 0.045 — not a final number).
+Resumed locally on the RTX 4060: **125-158 s/epoch** with all 3 teachers (no OOM), so
+~5-6 h for the remaining 140 epochs. `B_kd3t_augmix` is running from epoch 160
+(val_ema 96.30 at ep 162, LR 0.045 — mid-cosine, not a final number);
+`B_kd3t_trivial` still needs its own ~5 h afterwards, unless it runs on the HPC A100
+(~2.5 h for 300 epochs). Modal needs credit before it can be used again.
 
 Two robustness fixes came out of this: `modal_shared.run_task` now commits the runs
 volume every 10 min (Modal can preempt, and a hard kill otherwise loses everything),
@@ -204,6 +204,15 @@ and `train.trim_log` no longer crashes when `log.csv` is missing next to a resum
 3. **Report.** Method/setup draft in `REPORT_DRAFT.md`; Rahim owns results+discussion.
 4. **Rules**: no ensemble, no eval-label use; the 5M-vs-teacher reading is still an
    open question for staff and is flagged in the report draft.
+
+## Who writes which docs (agreed 2026-11-05)
+
+Rahim owns `README.md` and `EXPERIMENTS.md`. We write only where he asked for it: new
+rows in the README results table, the Track B checklist, and the flag reference for
+flags we add. Our analysis, numbers and reasoning stay in this file, `PLAN.md`,
+`AGENTS.md` and `REPORT_DRAFT.md` — do not rewrite his prose (an earlier commit
+rewrote his "rules" bullet with our reading of `overview.md`; that was reverted, and
+the finding lives here and in `REPORT_DRAFT.md` section 1 instead).
 
 ## Open questions for the teammate
 

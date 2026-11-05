@@ -12,11 +12,7 @@ Our approach:
 
 ## 2. Competition rules we must follow
 
-- The submitted network has <= 5M trainable params. Teams convention: **one model, no
-  ensemble** — the official text (`overview.md`) states the budget for "a modified
-  ResNet" and never mentions ensembles, so this is our conservative reading, not a
-  quoted rule. Measured: a 2-seed ensemble gains +0.34 on the composite shifted proxy
-  (p=0.15), i.e. inside public-LB noise.
+- The final submission is **one** network with <= 5M trainable params. No ensemble as the final model.
 - No pretrained weights, no external data.
 - Teachers (any size) must be trained from scratch by us, on the same train data.
 - Hidden test images are for inference only: no pseudo-labels, no test-time BN adaptation.
@@ -165,14 +161,9 @@ crop + flip, label smoothing 0.1, SGD + Nesterov, warmup + cosine LR, 200 epochs
 - `--kd-temp` [4]: temperature.
 
 **Augmentation**
-- `--autoaug` [`none`]: one of `none`, `trivial`, `randaug`, `autoaug_cifar`, `augmix`.
-  `augmix` is torchvision AugMix, severity 3, mixture width 3, **one view, no JSD loss**
-  (B3 winner: shift proxy +3.1pp, clean unchanged; see STATUS.md).
+- `--autoaug` [`none`]: one of `none`, `trivial`, `randaug`, `autoaug_cifar`, `augmix`
+  (Track B flag: torchvision AugMix, severity 3, one view, no JSD; see STATUS.md).
 - `--cutout SIZE` [0 = off]: one black square per image.
-- `--geo-aug`: mild affine (translate/scale/rotate). B3: −0.5 clean for +0.6 shifted,
-  not adopted by default.
-- `--extra-aug`: strong affine + color jitter. B3: −1.0 clean, no shifted gain —
-  experimental, do not use for real runs.
 - `--gpu-aug`: augment whole batches on the GPU instead of in CPU workers.
 - `--aug-chunk` [16]: with `--gpu-aug`, how many images share one autoaug draw.
 
@@ -378,11 +369,6 @@ Always put the run name and val accuracy in the submission message.
 
 Pending: `kd_r3_64_3t_600` (3 teachers) and the architecture sweep `runs/sweep_kd3t_300_*`.
 Run `python scripts/summarize.py` for the latest.
-
-**Track B (B4):** at 300 ep + SAM, `trivial` and `augmix` are clean-identical (97.08 EMA)
-and AugMix is +2.18pp on the combo shifted proxy (89.02 vs 86.84). The larger gain in
-the 150-ep pilot was 300 ep + SAM, not the augmentation — run augmentation ablations at
-the schedule you intend to ship.
 
 **Key finding:** the hidden test set is distribution-shifted. Models score 7-11 points lower
 on Kaggle than on our val split (our KD student: 97.76 val -> 0.904 public), and stronger

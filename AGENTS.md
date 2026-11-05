@@ -90,6 +90,20 @@ numbers: `STATUS.md`.
 - If `log.csv` shows `data_seconds` dominates, add `--gpu-aug` and adjust `--workers`.
 - HPC submit: `./submit.sh --job-name=A_... run.sbatch --arch ... --out runs/A_...`
 
+## Doc ownership (2026-11-05)
+
+- Rahim owns `README.md` and `EXPERIMENTS.md`. Write in them only where he asked:
+  new rows in the README **results table**, the **Track B checklist**, and the flag
+  reference for flags we add. Do not rewrite his prose, his rules section or his
+  numbers — an earlier commit replaced his "no ensembles" bullet with our reading of
+  `overview.md` and it had to be reverted.
+- Our content goes in `STATUS.md` (current state), `PLAN.md` (trajectory), `AGENTS.md`
+  (commands/conventions) and `REPORT_DRAFT.md` (report sections he asked us to draft).
+- Rules finding for the record: the official `overview.md` states the 5M budget for "a
+  modified ResNet" and never mentions ensembles or teachers; the "no ensembles" line is
+  the team convention, and a 2-seed ensemble measured +0.34 on the composite proxy
+  (p=0.15), inside public-LB noise. Keep that in STATUS/REPORT_DRAFT, not in README.
+
 ## Conventions
 
 - The val split is fixed at **seed 0** in `data.py`; never change it. Teachers and
