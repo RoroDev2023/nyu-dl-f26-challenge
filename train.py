@@ -98,6 +98,13 @@ def check_resume_args(saved, current, defaults=None):
 
 def trim_log(log_path, last_epoch):
     """Drop log rows from epochs after the checkpoint: they will be trained again."""
+    if not os.path.exists(log_path):
+        # checkpoint copied in without its log (e.g. pulled back from a cloud volume):
+        # start a fresh log rather than crashing on resume
+        with open(log_path, "w") as f:
+            f.write("epoch,lr,train_loss,train_acc,val_acc,val_acc_ema,seconds,data_seconds,"
+                    "ce_part,kd_part\n")
+        return
     with open(log_path) as f:
         lines = f.readlines()
     with open(log_path, "w") as f:

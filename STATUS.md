@@ -175,8 +175,21 @@ TrivialAug/Cutout16/mixup/CutMix, SAM rho=0.05, EMA 0.999, seed 0:
 | `B_kd3t_trivial` | control: `--autoaug trivial` | running |
 | `B_kd3t_augmix` | `--autoaug augmix` | running |
 
-~4.9 h each, run in parallel; a listener downloads both and evaluates clean + the
-proxies with paired McNemar, using `ckpts/A4.pt` (600 ep, trivial) as reference.
+**Modal hit the workspace spend limit at 14:20 on 2026-11-05** and killed both tasks
+(`KeyboardInterrupt` on the portal; not a code error). Both were at epoch ~163/300
+after 3 h 20 m, and `finally: volume.commit()` ran, so checkpoints survived at epoch
+160. Modal is now unusable until the cycle resets or credit is added.
+
+Resumed locally on the RTX 4060: **126 s/epoch** with all 3 teachers (no OOM), so ~4.5 h
+per arm for the remaining 140 epochs. `B_kd3t_augmix` is running now (ETA ~19:45);
+`B_kd3t_trivial` still needs its own 4.5 h afterwards, unless it is run on the HPC A100
+(~2.5 h for 300 epochs). Peak val_ema at the interruption: trivial 95.88, augmix 96.30
+(mid-cosine, LR still 0.045 — not a final number).
+
+Two robustness fixes came out of this: `modal_shared.run_task` now commits the runs
+volume every 10 min (Modal can preempt, and a hard kill otherwise loses everything),
+and `train.trim_log` no longer crashes when `log.csv` is missing next to a resumed
+`last.pt` (hit for real when a checkpoint is pulled back from a volume).
 
 ## Next steps (deadline: midnight 2026-11-06)
 
