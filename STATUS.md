@@ -163,37 +163,47 @@ saw on their KD student. Treat TTA as noise-level for these models.
   `scripts/shift_analysis.py --tta` is parsed but unused — its tables are always
   no-TTA.
 
-## B5 (running, 2026-11-05)
+## B5: KD + AugMix vs KD + trivial
 
-Rahim's 3 teachers landed and all have `val_size=5000`, so there is no teacher-on-val
-leak. Two matched arms, student `r3_80_2-3-3` (4.88M, his best sweep shape, 97.62 at
-300 ep), 300 epochs, 3 teachers (`wrn_s0` + `wrn_s1` + `pyr_s2`), KL alpha=0.9 T=4,
-TrivialAug/Cutout16/mixup/CutMix, SAM rho=0.05, EMA 0.999, seed 0:
+Two matched arms, student `r3_80_2-3-3` (4.88M, his best sweep shape), 300 epochs,
+3 teachers (`wrn_s0` + `wrn_s1` + `pyr_s2`, all with `val_size=5000` so there is no
+teacher-on-val leak), KL alpha=0.9 T=4, TrivialAug/Cutout16/mixup/CutMix, SAM rho=0.05,
+EMA 0.999, seed 0. Only `--autoaug` differs: `trivial` (control) vs `augmix`.
 
-| run | change vs control | status |
-|---|---|---|
-| `B_kd3t_trivial` | control: `--autoaug trivial` | running |
-| `B_kd3t_augmix` | `--autoaug augmix` | running |
+The run was interrupted twice (Modal billing limit at epoch ~163; late finish moved to
+Kaggle 2x T4 from the epoch-200 checkpoint) and the last 100 epochs are still finishing
+there. What follows is the **provisional** comparison at epoch 200/300, both arms at the
+same epoch, EMA + flip TTA, paired McNemar on the 5k holdout:
 
-**Modal hit the workspace spend limit at 14:20 on 2026-11-05** and killed both tasks
-(`KeyboardInterrupt` on the portal; not a code error). Both were at epoch ~163/300
-after 3 h 20 m, and `finally: volume.commit()` ran, so checkpoints survived at epoch
-160. Modal is now unusable until the cycle resets or credit is added.
+| condition | trivial | augmix | A4 (600 ep, trivial) |
+|---|---|---|---|
+| clean | 96.98 | 96.86 | 97.84 |
+| combo | 87.06 | 89.26 | 89.20 |
+| photo_strong | 91.14 | 93.06 | 94.78 |
+| shift3 | 96.06 | 96.42 | 97.68 |
 
-Resumed locally on the RTX 4060 briefly (125 s/epoch, no OOM) and **stopped on request**
-at epoch 178: too much load on a personal laptop. State saved for a proper machine:
+| comparison | condition | net | fixes/intros | p |
+|---|---|---|---|---|
+| augmix vs trivial | clean | -0.12 | 33/39 | 0.56 |
+| augmix vs trivial | combo | **+2.20** | 182/72 | 3.7e-12 |
+| augmix vs trivial | photo_strong | **+1.92** | 147/51 | 5.6e-12 |
+| augmix vs trivial | shift3 | +0.36 | 53/35 | 0.069 |
+| augmix vs A4 | clean | -0.98 | 10/59 | 1.4e-09 |
+| augmix vs A4 | combo | +0.06 | 126/123 | 0.90 |
+| augmix vs A4 | photo_strong | -1.72 | 43/129 | 3.5e-11 |
 
-- `runs/B_kd3t_augmix` locally: log to epoch 178, `last.pt` at **epoch 160**
-  (`--save-every 20`, so 161-178 would be redone), val_ema 96.36 at ep 178.
-- The **Modal volume still holds the untouched epoch-160 checkpoints** for both arms,
-  with the original `/runs/...` + `/data/teachers/...` args — prefer those for a cloud
-  or HPC resume; the local copy has its `args` rewritten to local paths.
-- Modal needs credit before it can be used again. HPC A100: ~2.5 h per 300-epoch arm.
+**Reading.** AugMix survives distillation at the same effect size as in the no-KD B4
+comparison (+2.2 combo, +1.9 photo, clean neutral), so it is an augmentation effect
+rather than a KD interaction, and it costs nothing on clean val. At 2/3 of the schedule
+the AugMix arm is already level with the 600-epoch A4 on the composite proxy while still
+~1 point behind on clean. Recommendation for A6: train with `--autoaug augmix`.
 
-Two robustness fixes came out of this: `modal_shared.run_task` now commits the runs
-volume every 10 min (Modal can preempt, and a hard kill otherwise loses everything),
-and `train.trim_log` no longer crashes when `log.csv` is missing next to a resumed
-`last.pt` (hit for real when a checkpoint is pulled back from a volume).
+Caveats: single seed, 200/300 epochs, and two interruptions (resumed from epoch-160 and
+epoch-200 checkpoints). Detail: `runs/analysis/B5_provisional.md`.
+
+Two robustness fixes came out of the Modal/Laptop trouble: `modal_shared.run_task`
+commits the runs volume every 10 min, and `train.trim_log` no longer crashes when
+`log.csv` is missing next to a resumed `last.pt`.
 
 ## Next steps (deadline: midnight 2026-11-06)
 
