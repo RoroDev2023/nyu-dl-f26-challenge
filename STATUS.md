@@ -201,6 +201,14 @@ the AugMix arm is already level with the 600-epoch A4 on the composite proxy whi
 Caveats: single seed, 200/300 epochs, and two interruptions (resumed from epoch-160 and
 epoch-200 checkpoints). Detail: `runs/analysis/B5_provisional.md`.
 
+**Outcome (2026-11-06, late):** the team's submissions were chosen before this could be
+used, so B5 is report material, not a submission. The last 100 epochs are still running
+unattended on Kaggle (`pmv264/b5-kd-arms`); the output stays downloadable after it ends
+with `kaggle kernels output pmv264/b5-kd-arms -p <dir>`, which includes
+`runs/B_kd3t_*/{last.pt,results.json,log.csv}` for all 300 epochs. If it is ever wanted,
+re-run `scripts/shift_analysis.py --checkpoints ...` on those and replace the provisional
+tables above. No local jobs, no Modal jobs, nothing else pending.
+
 Two robustness fixes came out of the Modal/Laptop trouble: `modal_shared.run_task`
 commits the runs volume every 10 min, and `train.trim_log` no longer crashes when
 `log.csv` is missing next to a resumed `last.pt`.
