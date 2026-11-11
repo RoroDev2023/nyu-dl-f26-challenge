@@ -137,9 +137,9 @@ baseline (raw), all tricks, two-teacher KD, A4 (600 epochs), and V2 (1,200
 epochs). (b) B4 augmentation at 300 epochs; the AugMix curve is seed 1 because the
 seed-0 log was not preserved (final EMA 97.08 vs.\ 96.88 for seed 1), and raw
 accuracy is dashed. (c) 60-epoch continuations from A4; the dotted line is the
-untouched A4 start (97.72 EMA, no TTA). Every continuation ends at or below that
-start. Final flip/5-crop TTA numbers are in Tables~\ref{tab:main}
-and~\ref{tab:negative}.}
+untouched A4 EMA on the same no-TTA evaluation (97.72). The finishers stay within
+0.35 points of it; none is a significant gain. Final flip/5-crop TTA numbers
+are in Tables~\ref{tab:main} and~\ref{tab:negative}.}
 \label{fig:curves}
 \end{figure*}
 
