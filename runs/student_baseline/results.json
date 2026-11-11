@@ -1,0 +1,9 @@
+{
+  "arch": "r3_64_3-5-3",
+  "params": 4918602,
+  "epochs": 200,
+  "val_acc": 0.9476,
+  "val_acc_tta": 0.9542,
+  "val_acc_ema": null,
+  "val_acc_ema_tta": null
+}

@@ -1,0 +1,9 @@
+{
+  "arch": "pyramid_110_270",
+  "params": 28485477,
+  "epochs": 400,
+  "val_acc": 0.9758,
+  "val_acc_tta": 0.9766,
+  "val_acc_ema": 0.9764,
+  "val_acc_ema_tta": 0.9764
+}

@@ -1,5 +1,4 @@
 data/
-runs/
 .venv-1/
 .venv/
 *.pt
@@ -10,7 +9,12 @@ submission.csv
 __pycache__/
 .DS_Store
 logs/
-runs/
 submission*.csv
 data
 teachers/
+# runs: only the small per-run files go to git, never checkpoints
+runs/**
+!runs/*/
+!runs/*/log.csv
+!runs/*/results.json
+!runs/*/args.json
