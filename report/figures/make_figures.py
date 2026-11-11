@@ -76,7 +76,7 @@ def montage() -> None:
     top = a[47:224, 23:1598]
     bot = a[267:445, 23:1598]
 
-    fig, axes = plt.subplots(2, 1, figsize=(7.0, 1.85))
+    fig, axes = plt.subplots(2, 1, figsize=(7.0, 1.75))
     for ax, img, label in zip(
         axes, [top, bot],
         ["(a) CIFAR-10 training images (reference)",
@@ -91,60 +91,83 @@ def montage() -> None:
 
 # ---------------------------------------------------------------- fig 2: curves
 def curves() -> None:
-    triv = load_log("B_trivial_300_sam.csv")
-    aug1 = load_log("B_augmix_300_sam_s1.csv")
-    kdt = load_log("B_kd3t_trivial.csv")
-    kda = load_log("B_kd3t_augmix.csv")
+    """Three validation-curve panels: Track A, B4 augmentation, C60 finishers."""
+    fig, axes = plt.subplots(1, 3, figsize=(7.0, 2.0))
 
-    ncols = 2
-    fig, axes = plt.subplots(1, ncols, figsize=(7.0, 2.05))
-
-    # (a) B4 clean validation curves
+    # (a) Track A: baseline -> tricks -> KD -> long schedules
     ax = axes[0]
-    if triv is not None:
-        ax.plot(triv.epoch, 100 * triv.val_acc, color=C_TRIV, lw=0.6,
-                alpha=0.55, ls="--")
-        ax.plot(triv.epoch, 100 * triv.val_acc_ema, color=C_TRIV, lw=1.4,
-                label="TrivialAug, EMA (s0)")
-    if aug1 is not None:
-        ax.plot(aug1.epoch, 100 * aug1.val_acc, color=C_AUG1, lw=0.6,
-                alpha=0.55, ls="--")
-        ax.plot(aug1.epoch, 100 * aug1.val_acc_ema, color=C_AUG1, lw=1.4,
-                label="AugMix, EMA (s1)")
+    track = [
+        ("student_baseline", "baseline", C_GREY, "raw"),
+        ("student_tricks_300", "all tricks", C_TRIV, "ema"),
+        ("kd_r3_64_2t_600", "KD 2T", C_AUG, "ema"),
+        ("A4_r3_80_600", "A4 600", C_RED, "ema"),
+        ("V2_r3_80_1200", "V2 1200", "#7B3294", "ema"),
+    ]
+    for name, label, color, which in track:
+        d = load_log(f"{name}.csv")
+        if d is None:
+            continue
+        col = "val_acc" if which == "raw" else "val_acc_ema"
+        ax.plot(d.epoch, 100 * d[col], color=color, lw=1.1, label=label)
     ax.set_xlabel("epoch")
     ax.set_ylabel("clean validation accuracy (%)")
+    ax.set_xlim(1, 1200)
+    ax.set_xticks([0, 300, 600, 900, 1200])
+    ax.set_ylim(25, 99)
+    ax.set_title("(a) Track A: accuracy recipe", loc="left", fontsize=7)
+    ax.legend(loc="lower right", frameon=False, fontsize=5.5,
+              handlelength=1.2, labelspacing=0.2)
+    ax.grid(axis="y", lw=0.3, alpha=0.5)
+
+    # (b) B4: augmentation at the shipping schedule
+    ax = axes[1]
+    triv = load_log("B_trivial_300_sam.csv")
+    aug1 = load_log("B_augmix_300_sam_s1.csv")
+    if triv is not None:
+        ax.plot(triv.epoch, 100 * triv.val_acc, color=C_TRIV, lw=0.5,
+                alpha=0.45, ls="--")
+        ax.plot(triv.epoch, 100 * triv.val_acc_ema, color=C_TRIV, lw=1.2,
+                label="TrivialAug (s0)")
+    if aug1 is not None:
+        ax.plot(aug1.epoch, 100 * aug1.val_acc, color=C_AUG1, lw=0.5,
+                alpha=0.45, ls="--")
+        ax.plot(aug1.epoch, 100 * aug1.val_acc_ema, color=C_AUG1, lw=1.2,
+                label="AugMix (s1)")
+    ax.set_xlabel("epoch")
     ax.set_xlim(1, 300)
     ax.set_ylim(25, 99)
-    ax.set_title("(a) B4: augmentation at 300 epochs", loc="left")
-    ax.legend(loc="lower right", frameon=False)
+    ax.set_title("(b) B4: augmentation", loc="left", fontsize=7)
+    ax.legend(loc="lower right", frameon=False, fontsize=5.5)
     ax.grid(axis="y", lw=0.3, alpha=0.5)
 
-    # (b) B5 KD arms (partial logs)
-    ax = axes[1]
-    if kdt is not None:
-        ax.plot(kdt.epoch, 100 * kdt.val_acc_ema, color=C_TRIV, lw=1.4,
-                label="KD + TrivialAug (s0)")
-    if kda is not None:
-        ax.plot(kda.epoch, 100 * kda.val_acc_ema, color=C_AUG, lw=1.4,
-                label="KD + AugMix (s0)")
-    if kdt is not None and kda is not None:
-        cut = int(min(kdt.epoch.max(), kda.epoch.max()))
-        ax.axvline(cut, color=C_GREY, lw=0.6, ls=":")
-        ax.text(cut + 3, 26.5, f"common epoch {cut}", fontsize=6,
-                color=C_GREY)
-    ax.set_xlabel("epoch")
-    ax.set_ylabel("clean validation accuracy, EMA (%)")
-    ax.set_xlim(1, 180)
-    ax.set_ylim(25, 99)
-    ax.set_title("(b) B5: KD arms (provisional, 300 planned)", loc="left")
-    ax.legend(loc="lower right", frameon=False)
+    # (c) C60: 60-epoch continuations from A4
+    ax = axes[2]
+    c60 = [
+        ("C60_sam", "SAM control", C_GREY),
+        ("C60_asam", "ASAM", C_RED),
+        ("C60_swa", "SWA", "#7B3294"),
+        ("C60_lskd", "LS-KD", "#008837"),
+        ("C60_a045", "$\\alpha$=0.45", C_AUG),
+    ]
+    for name, label, color in c60:
+        d = load_log(f"{name}.csv")
+        if d is None:
+            continue
+        ax.plot(d.epoch, 100 * d.val_acc_ema, color=color, lw=1.1, label=label)
+    ax.axhline(97.72, color="black", lw=0.5, ls=":", zorder=0)
+    ax.text(33, 97.76, "A4 start", fontsize=5, color="black", va="bottom")
+    ax.set_xlabel("fine-tune epoch")
+    ax.set_xlim(1, 60)
+    ax.set_ylim(96.8, 98.2)
+    ax.set_title("(c) 60-epoch finishers", loc="left", fontsize=7)
+    ax.legend(loc="lower right", frameon=False, fontsize=5.2,
+              handlelength=1.1, labelspacing=0.15)
     ax.grid(axis="y", lw=0.3, alpha=0.5)
 
-    fig.tight_layout(w_pad=1.4)
+    fig.tight_layout(w_pad=1.0)
     save(fig, "fig_val_curves")
 
 
-# ---------------------------------------------------------------- fig 3: robustness
 def robustness() -> None:
     d = json.loads((DATA / "shift_B4_seeds.json").read_text())
     models = [
@@ -162,7 +185,7 @@ def robustness() -> None:
     x = np.arange(len(conditions))
     w = 0.8 / len(models)
 
-    fig, ax = plt.subplots(figsize=(7.0, 2.15))
+    fig, ax = plt.subplots(figsize=(7.0, 2.0))
     for i, (label, key, color) in enumerate(models):
         vals = [100 * d[key][k] for _, k in conditions]
         bars = ax.bar(x + (i - 1) * w, vals, w, label=label, color=color,
@@ -281,5 +304,3 @@ if __name__ == "__main__":
     curves()
     robustness()
     pilot()
-    failed_curves()
-    track_a_curves()

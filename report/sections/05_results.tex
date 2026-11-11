@@ -3,7 +3,8 @@
 
 \subsection{Main Accuracy}
 
-Table~\ref{tab:main} summarizes the accuracy progression. A plain 200-epoch
+Table~\ref{tab:main} summarizes the accuracy progression, and
+Figure~\ref{fig:curves}(a) shows the corresponding validation curves. A plain 200-epoch
 student reaches 94.76\% validation accuracy. Adding the full training recipe
 (300 epochs, TrivialAugment, Cutout, mixup/CutMix, SAM, EMA) raises this to
 97.36\%, a gain of 2.6 points. Two-teacher KD adds 0.38 points (97.74\%), and a
@@ -77,7 +78,7 @@ epochs, no SAM, no KD). The control (TrivialAugment) reaches 96.48\% clean TTA
 and 84.32\% on the composite proxy. RandAugment (96.50/83.70) and
 AutoAugment-CIFAR (96.62/83.14) are slightly better on clean data and worse on
 the proxy. Geometry-only (95.98/84.96) loses 0.50 clean for 0.64 proxy.
-Affine+color (95.46/84.38) loses clean accuracy without a proxy gain. AugMix is
+Affine+color (95.46/84.38) loses clean accuracy without a proxy gain. One-view AugMix is
 the only policy that is clean-neutral (96.52, +0.04) and substantially better on
 the proxy (87.42, +3.10). The pilot motivated the full 300-epoch test, but its
 effect size is inflated: the 300-epoch control also improves a lot.
@@ -118,14 +119,27 @@ size as in the no-KD comparison. The run was interrupted and the two logs stop a
 epochs 163 and 178 of 300; the comparison is provisional and was not used for
 submission selection.
 
+\paragraph{The JSD caveat.}
+The B4/B5 variant is image-only, one-view AugMix without the Jensen-Shannon
+consistency term. A separate 80-epoch AugMix+JSD finisher (JSD weight 12, ramped
+over 10 epochs) behaved differently: it gained 2.2 points on the blur proxy
+relative to the matched control but lost about one point on clean validation
+(96.88 vs.\ 97.44 for the control and 97.84 for untouched A4). It failed our
+clean-accuracy gate and was not submitted. The clean-neutral result should
+therefore be read as specific to the one-view variant at the schedules we tested,
+not to AugMix with JSD.
+
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_val_curves.pdf}
-\caption{Validation curves. (a) B4 augmentation comparison at 300 epochs; the
-AugMix curve is seed 1 because the seed-0 log was not preserved (its final EMA is
-97.08, versus 96.88 for seed 1). Raw accuracy is dashed, EMA is solid. (b) The
-provisional KD arms; logs stop at epochs 163 and 178 of the planned 300, so the
-curves are shown only up to the common epoch.}
+\caption{Validation curves (EMA weights unless noted, no TTA). (a) Track A:
+baseline (raw), all tricks, two-teacher KD, A4 (600 epochs), and V2 (1,200
+epochs). (b) B4 augmentation at 300 epochs; the AugMix curve is seed 1 because the
+seed-0 log was not preserved (final EMA 97.08 vs.\ 96.88 for seed 1), and raw
+accuracy is dashed. (c) 60-epoch continuations from A4; the dotted line is the
+untouched A4 start (97.72 EMA, no TTA). Every continuation ends at or below that
+start. Final flip/5-crop TTA numbers are in Tables~\ref{tab:main}
+and~\ref{tab:negative}.}
 \label{fig:curves}
 \end{figure*}
 
@@ -133,7 +147,7 @@ curves are shown only up to the common epoch.}
 \centering
 \includegraphics[width=\textwidth]{figures/fig_robustness.pdf}
 \caption{Clean and shifted accuracy for the 300-epoch B4 arms (EMA weights, no
-TTA). AugMix is clean-neutral and improves the composite, noise, and JPEG
+TTA). One-view AugMix is clean-neutral and improves the composite, noise, and JPEG
 proxies; the two seeds give +2.18 and +1.80 on the composite. These are label-free
 stress tests, not measurements of the final test set.}
 \label{fig:robustness}

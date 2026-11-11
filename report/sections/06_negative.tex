@@ -54,14 +54,20 @@ choice for robustness; we therefore require both clean neutrality and a proxy
 gain before adopting an augmentation.
 
 \paragraph{ASAM and SWA.}
-A 60-epoch ASAM continuation from A4 beats the matched SAM continuation by 0.18
-points (98.00 vs.\ 97.82, $p=0.049$), but it does not beat the untouched A4
-start point (97.92; $+0.08$, $p=0.50$). The confirm run from the two-teacher
-student moves by +1 image against its SAM control and +2 against the untouched
-model ($p=0.83$); pooled over both start points, ASAM versus the untouched model
-is +6 of 10,000 images ($p=0.44$). ASAM is better than SAM for this late
-continuation, but the continuation itself does not improve the model. SWA is
-neutral (97.80 vs.\ 97.82). We did not launch fresh 1,200-epoch ASAM/SWA runs.
+Figure~\ref{fig:curves}(c) shows the five 60-epoch continuations from A4; none ends
+above the untouched start. A 60-epoch ASAM continuation beats the matched SAM
+continuation by 0.18 points (98.00 vs.\ 97.82, $p=0.049$), but it does not beat
+the untouched A4 start point (97.92; $+0.08$, $p=0.50$). The confirm run from the
+two-teacher student moves by +1 image against its SAM control and +2 against the
+untouched model ($p=0.83$); pooled over both start points, ASAM versus the
+untouched model is +6 of 10,000 images, but the two comparisons reuse the same
+5,000 images, so this pooled count is exploratory. ASAM is better than SAM for
+this late continuation, but the continuation itself does not improve the model.
+SWA is neutral (97.80 vs.\ 97.82). A fresh 300-epoch ASAM run changes one image
+(97.64 vs.\ 97.62); applying the 60-epoch ASAM finish to F2s1 changes 33/2,000
+test labels and scores 0.908 public versus 0.911 for the untouched model; the
+corresponding weight soup also scores 0.908. We did not launch fresh 1,200-epoch
+ASAM/SWA runs.
 
 \paragraph{LS-KD.}
 Logit-standardized KD is a calibration intervention in our hands, not an accuracy
@@ -92,7 +98,12 @@ badly: 97.08 vs.\ 97.92 for A4 and 97.20 vs.\ 97.94 for V2. The saved BN
 statistics are already well matched to the evaluation transform; replacing them
 with clean-image statistics removes the augmentation-induced robustness.
 
+\paragraph{Fresh 300-epoch sweep.}
+A matched 300-epoch sweep found no gain from extra regularization or a different
+KD weight: two-teacher KD is neutral (97.66), KD $\alpha=0.45$ loses 11 images,
+and stochastic depth 0.1 loses 18 (97.30 vs.\ 97.66, $p=0.005$).
+
 \paragraph{What we did not test.}
-DKD, structural teacher pruning, SE blocks (the flag exists but the A3 SE run was
-never scored), and fresh 1,200-epoch ASAM/SWA/LS-KD runs were left untested.
-These are the most promising follow-ups but did not fit the compute budget.
+DKD, structural teacher pruning, SE blocks, and fresh 1,200-epoch ASAM/SWA/LS-KD
+runs were left untested; they are the most promising follow-ups but did not fit
+the compute budget.

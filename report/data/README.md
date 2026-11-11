@@ -9,6 +9,14 @@ archived runs/analysis on 2026-11-11.
 | `logs/B_augmix_300_sam_s1.csv` | `runs/B_augmix_300_sam_s1/log.csv` | 300 epochs, seed 1; the seed-0 log was not preserved |
 | `logs/B_kd3t_trivial.csv` | `runs/B_kd3t_trivial/log.csv` | stops at epoch 163/300 |
 | `logs/B_kd3t_augmix.csv` | `runs/B_kd3t_augmix/log.csv` | stops at epoch 178/300 |
+| `logs/student_baseline.csv` | `runs/student_baseline/log.csv` | 200 ep, raw val only |
+| `logs/student_tricks_300.csv` | `runs/student_tricks_300/log.csv` | 300 ep |
+| `logs/kd_r3_64_2t_600.csv` | `runs/kd_r3_64_2t_600/log.csv` | 600 ep |
+| `logs/A4_r3_80_600.csv` | `runs/A4_r3_80_600/log.csv` | 600 ep |
+| `logs/V2_r3_80_1200.csv` | `runs/V2_r3_80_1200/log.csv` | 1,200 ep |
+| `logs/C60_sam.csv`, `C60_asam.csv`, `C60_swa.csv`, `C60_lskd.csv`, `C60_a045.csv` | `runs/C60_*/log.csv` | 60-epoch continuations from A4 |
+| `EXPERIMENTS_main.md` | `origin/main:EXPERIMENTS.md` (commit `e240728`) | Rahim's latest run log |
+| `PROJECT_REPORT_FOR_REVIEW.md` | `origin/main:PROJECT_REPORT_FOR_REVIEW.md` | pre-deadline review memo; source for J80/V300/S300 results |
 | `shift_B4_300.json` | `runs/analysis/B4_300/B_shift.json` | B4 clean/shifted accuracies, no TTA |
 | `shift_B4_seeds.json` | `runs/analysis/B4_seeds/B_shift.json` | B4 two-seed comparison, no TTA |
 | `shift_B3.json` | `runs/analysis/B_shift.json` | 150-epoch augmentation pilot |
@@ -16,8 +24,9 @@ archived runs/analysis on 2026-11-11.
 | `B4_paired.md` | `runs/analysis/B4_paired.md` | paired McNemar tests, photographic proxies |
 | `B5_provisional.md` | `runs/analysis/B5_provisional.md` | KD arms at epoch 200/300 |
 
-`figures/source/shift_montage.png` and `corruption_gallery.png` are the archived
-`runs/analysis` images. `make_figures.py` crops the montage's baked-in labels and
+The Track A and C60 logs were added on 2026-11-11 from Rahim's `main` branch
+(commit `e240728`). `figures/source/shift_montage.png` and
+`corruption_gallery.png` are the archived `runs/analysis` images. `make_figures.py` crops the montage's baked-in labels and
 replaces them with labels that say the sample is not the final evaluation set.
 
 ## Final result
@@ -29,14 +38,12 @@ attribute it to one model.
 
 ## Missing / optional
 
-Not in this checkout, but small enough to add to git if Rahim can:
+Still missing, but small enough to add if Rahim can:
 
 - `runs/B_augmix_300_sam/log.csv` (completes the B4 seed-0 curve)
 - completed `runs/B_kd3t_{trivial,augmix}/log.csv` and `results.json`
-- `runs/A4_r3_80_600/log.csv`, `runs/V2_r3_80_1200/log.csv`,
-  `runs/kd_r3_64_2t_600/log.csv`
-- `runs/C60_*/log.csv`, `runs/F300_lskd/log.csv`, `runs/W40_s0/log.csv`,
-  `runs/W40_s1/log.csv`
+- `runs/F300_lskd/log.csv`, `runs/W40_s0/log.csv`, `runs/W40_s1/log.csv`
+  (optional failure curves)
 
 Drop them into `logs/` with the names listed in the report README and rerun
 `figures/make_figures.py`.

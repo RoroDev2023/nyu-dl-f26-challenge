@@ -31,8 +31,8 @@ before building a narrative around it. The analysis pipeline remains useful
 (it is reproducible and we would reuse it), but its conclusions do not transfer
 to the final test set.
 
-\paragraph{Why AugMix was not shipped.}
-AugMix is the one robustness intervention that survived every check we ran: it is
+\paragraph{Why one-view AugMix was not shipped.}
+One-view AugMix is the one robustness intervention that survived every check we ran: it is
 clean-neutral at 300 epochs, improves the composite by 2.2 points, improves
 photographic jitter by 1.1--1.9 points, replicates across seeds, and keeps its
 effect under three-teacher KD. It was still not in the final submission. The KD
@@ -42,14 +42,6 @@ Given that the final private gap is unexplained, we cannot claim that shipping
 AugMix would have improved the score. The honest conclusion is that it was the
 best-supported robustness candidate we had, and the submission schedule did not
 allow us to test it at the shipping scale.
-
-\paragraph{Rules and teacher size.}
-The official overview constrains the submitted model to 5M trainable parameters
-and prohibits pretrained weights and external data. It does not constrain the
-size of auxiliary teachers. Our teachers are 28.5M and 36.5M parameters, trained
-from scratch on the same 50,000 images; only the 4.88M student is submitted. We
-state this explicitly because the budget is easy to misread as applying to every
-model trained along the way.
 
 \paragraph{Limitations.}
 Most comparisons use a single seed; the exceptions are the two AugMix seeds and

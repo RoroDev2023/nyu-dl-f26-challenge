@@ -46,7 +46,7 @@ our shift analysis is exploratory. We also report what did \emph{not} work:
 RandAugment, AutoAugment-CIFAR, geometry-only and affine+color augmentation,
 ASAM/SWA fine-tuning, logit-standardized KD, a two-model parameter split,
 multi-crop TTA, test-time BN adaptation, Sinkhorn balancing, and seed ensembling.
-AugMix was the one clean-neutral augmentation that consistently improved
+One-view AugMix was the one clean-neutral augmentation that consistently improved
 corrupted and photometric proxies, but it was not shipped because its KD
 confirmation finished after submission selection. We argue that negative results
 and explicit uncertainty about the test distribution are as useful as the final
@@ -62,6 +62,8 @@ score.
 \input{sections/07_discussion}
 \input{sections/08_conclusion}
 
+{\small
 \bibliography{references}
+}
 
 \end{document}

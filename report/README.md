@@ -37,26 +37,27 @@ Regenerate all figures with the `ml` environment:
 ```
 
 The script reads only `data/` and `figures/source/`; it does not need the
-competition data or any checkpoint. Optional per-epoch logs dropped into
-`data/logs/` are picked up automatically:
-
-- `A4_r3_80_600.csv`, `V2_r3_80_1200.csv`, `kd_r3_64_2t_600.csv`
-  → `fig_track_a_curves`
-- `C60_sam.csv`, `C60_asam.csv`, `C60_swa.csv`, `C60_lskd.csv`, `C60_a045.csv`
-  → `fig_failed_curves`
-
-These are not included in the current draft because the logs were not in the
-checkout. If Rahim adds them, rerun the script and add the figures to the
-corresponding sections.
+competition data or any checkpoint. The Track A logs (`student_baseline`,
+`student_tricks_300`, `kd_r3_64_2t_600`, `A4_r3_80_600`, `V2_r3_80_1200`) and the
+C60 finisher logs are now included and drive Figure 2(a) and 2(c). Still missing:
+`B_augmix_300_sam` (the B4 seed-0 curve), the completed B5 logs, and the optional
+`F300_lskd`/`W40_*` logs.
 
 ## Data provenance and the corrected shift story
 
 Numbers come from two places:
 
-1. **Track A** (accuracy, KD, architecture, continuations): the merged
-   `EXPERIMENTS.md` on `b_shift` (includes `origin/main` commit `b4f77ac`).
+1. **Track A** (accuracy, KD, architecture, continuations): `origin/main`'s
+   `EXPERIMENTS.md` at commit `e240728` (copied to `data/EXPERIMENTS_main.md`),
+   plus the per-epoch logs copied from the same commit.
 2. **Track B** (augmentation, proxies): `STATUS.md`, `runs/analysis/B4_paired.md`,
    `runs/analysis/B5_provisional.md`, and the JSON files copied into `data/`.
+
+The new 2026-11-06 material (fresh ASAM, V300 sweep, AugMix+JSD finisher, and the
+F2s1+ASAM submission) is sourced from `data/EXPERIMENTS_main.md` and
+`data/PROJECT_REPORT_FOR_REVIEW.md`; the corresponding curves come from the C60
+logs. The J80/V300 run logs themselves were not in the push, so those numbers are
+table/text only.
 
 **Important correction.** The 2,000 unlabeled images distributed with the starter
 data were **not** the final evaluation images. Earlier repo documents describe
@@ -89,6 +90,7 @@ does not attribute it to a single model.
 
 - B5 is provisional (200/300 epochs; logs stop at 163/178). It is labeled as
   such everywhere.
-- Track A and failed-continuation validation curves are missing; the report uses
-  tables for those results. Add the logs and regenerate to strengthen Section 6.
+- The B4 seed-0 curve and the completed B5 logs are still missing; Figure 2(b)
+  uses seed 1 (caption says so) and B5 is marked provisional.
+- J80/V300 logs were not in Rahim's push, so those results are table/text only.
 - No checkpoints or competition data are needed to rebuild the current draft.
