@@ -1,0 +1,9 @@
+{
+  "arch": "wrn_40_2",
+  "params": 2243546,
+  "epochs": 300,
+  "val_acc": 0.9678,
+  "val_acc_tta": 0.9698,
+  "val_acc_ema": 0.9672,
+  "val_acc_ema_tta": 0.9708
+}

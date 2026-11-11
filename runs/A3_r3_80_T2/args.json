@@ -6,15 +6,15 @@
   "wd": 0.0005,
   "warmup": 5,
   "label_smoothing": 0.1,
-  "workers": 3,
+  "workers": 6,
   "out": "runs/A3_r3_80_T2",
   "seed": 0,
   "val_size": 5000,
   "no_budget": false,
   "teachers": [
-    "runs/teacher_wrn_s0/last.pt",
-    "runs/teacher_pyr_s2/last.pt",
-    "runs/teacher_wrn_s1/last.pt"
+    "teachers/teacher_wrn_s0.pt",
+    "teachers/teacher_pyr_s2.pt",
+    "teachers/teacher_wrn_s1.pt"
   ],
   "kd_alpha": 0.9,
   "kd_temp": 2.0,

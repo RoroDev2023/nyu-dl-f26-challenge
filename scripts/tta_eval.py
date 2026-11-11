@@ -72,7 +72,7 @@ def cmd_cache(a):
     import torch
     from data import load_train, load_test, train_val_split
     from models import load_model, count_params
-    from tta import view_probs
+    from tta import view_probs, SHIFTS, SHIFTS9
 
     dev = torch.device("cuda" if torch.cuda.is_available()
                        else "mps" if torch.backends.mps.is_available() else "cpu")
@@ -90,7 +90,7 @@ def cmd_cache(a):
     else:
         x, ids = load_test()
         y = np.full(len(ids), -1)
-    probs = view_probs(model, x, dev)
+    probs = view_probs(model, x, dev, shifts=SHIFTS9 if a.views == 18 else SHIFTS)
     os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
     np.savez(a.out, probs=probs.astype(np.float32), y=y, ids=ids, params=n,
              epoch=ck.get("epoch", -1), ema=used_ema, ckpt=a.ckpt, md5=md5(a.ckpt),
@@ -99,7 +99,7 @@ def cmd_cache(a):
     if a.split == "val":
         from tta import combine
         msg += (f"\n  flip acc {(combine(probs, 'flip').argmax(1) == y).mean()*100:.2f}"
-                f"  5crop acc {(combine(probs, '5crop').argmax(1) == y).mean()*100:.2f}")
+                f"  all-{probs.shape[0]}-views acc {(combine(probs, 'all').argmax(1) == y).mean()*100:.2f}")
     print(msg, "->", a.out)
 
 
@@ -207,6 +207,7 @@ def main():
     c = s.add_parser("cache"); c.add_argument("ckpt"); c.add_argument("out")
     c.add_argument("--split", choices=["val", "test"], required=True)
     c.add_argument("--no-ema", action="store_true")
+    c.add_argument("--views", type=int, default=10, choices=[10, 18], help="18 = add diagonal shifts")
     c = s.add_parser("policies"); c.add_argument("caches", nargs="+")
     c = s.add_parser("compare"); c.add_argument("caches", nargs="+")
     c.add_argument("--policy", default="5crop"); c.add_argument("--save-errors")

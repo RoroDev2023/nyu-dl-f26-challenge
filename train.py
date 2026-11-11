@@ -140,6 +140,11 @@ def main():
     p.add_argument("--mix-prob", type=float, default=1.0, help="chance to mix each batch")
     p.add_argument("--mix-off-epochs", type=int, default=0, help="no mixing for the last N")
     p.add_argument("--gpu-aug", action="store_true", help="augment batches on the GPU")
+    p.add_argument("--jsd-weight", type=float, default=0.0,
+                   help="AugMix + Jensen-Shannon consistency (Hendrycks et al. 2020; authors: 12). "
+                        "CE + KD on the clean view, JSD over clean + 2 AugMix views. 0 = off")
+    p.add_argument("--jsd-ramp-epochs", type=int, default=10, help="JSD weight ramps 0 -> full")
+    p.add_argument("--augmix-severity", type=int, default=3)
     p.add_argument("--aug-chunk", type=int, default=16, help="--gpu-aug: images per policy draw")
     # SAM, EMA
     p.add_argument("--sam", action="store_true")
@@ -166,6 +171,10 @@ def main():
     p.add_argument("--lr-min", type=float, default=0.001)
     args = p.parse_args()
     defaults = vars(p.parse_args([]))
+    if args.jsd_weight > 0 and (args.gpu_aug or args.autoaug != "none" or args.cutout
+                                or args.mixup_alpha or args.cutmix_alpha):
+        p.error("--jsd-weight needs CPU aug (no --gpu-aug), --autoaug none, --cutout 0, "
+                "--mixup-alpha 0, --cutmix-alpha 0")
     if args.lr_schedule == "cyclic" and args.epochs % args.cycle_epochs:
         p.error("--epochs must be a multiple of --cycle-epochs")
 
@@ -188,7 +197,7 @@ def main():
         torch.backends.cudnn.benchmark = True     # images are all the same size
     train_loader, val_loader = get_loaders(args.batch_size, args.val_size, args.workers,
                                            args.autoaug, args.cutout, args.gpu_aug, device,
-                                           args.aug_chunk)
+                                           args.aug_chunk, args.jsd_weight > 0, args.augmix_severity)
 
     raw_model = build_model(config).to(device)
     if args.init_from and not os.path.exists(os.path.join(args.out, "last.pt")):
@@ -268,6 +277,22 @@ def main():
         kd_part = w_kd * kd_loss(logits, probs, args.kd_temp, stand)
         return ce_part + kd_part, ce_part.detach(), kd_part.detach()
 
+    def forward_loss(x, x_all, y_a, y_b, lam, probs, jsd_w):
+        """CE + KD on the clean view; with AugMix views also jsd_w * JSD(clean, aug1, aug2),
+        as in google-research/augmix (mixture clamped at 1e-7, batchmean KL, mean of 3)."""
+        if x_all is None:
+            logits = model(x)
+            loss, ce_part, kd_part = compute_loss(logits.float(), y_a, y_b, lam, probs)
+            return loss, logits, ce_part, kd_part
+        out = model(x_all).float()
+        logits, l1, l2 = out.chunk(3)
+        loss, ce_part, kd_part = compute_loss(logits, y_a, y_b, lam, probs)
+        p_c, p_1, p_2 = F.softmax(logits, 1), F.softmax(l1, 1), F.softmax(l2, 1)
+        log_m = torch.clamp((p_c + p_1 + p_2) / 3., 1e-7, 1).log()
+        jsd = (F.kl_div(log_m, p_c, reduction="batchmean") + F.kl_div(log_m, p_1, reduction="batchmean")
+               + F.kl_div(log_m, p_2, reduction="batchmean")) / 3.
+        return loss + jsd_w * jsd, logits, ce_part, kd_part
+
     # resume if this folder already has a checkpoint
     last_path = os.path.join(args.out, "last.pt")
     log_path = os.path.join(args.out, "log.csv")
@@ -301,12 +326,19 @@ def main():
         totals = torch.zeros(4, device=device)    # loss, correct, ce part, kd part
         seen = 0
         mix_on = epoch <= args.epochs - args.mix_off_epochs
+        jsd_w = args.jsd_weight * min(1.0, epoch / max(1, args.jsd_ramp_epochs))
         batches = iter(train_loader)
         for _ in range(steps_per_epoch):
             t_data = time.time()
             x, y = next(batches)
             data_secs += time.time() - t_data
             x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
+            x_all = None
+            if args.jsd_weight > 0:     # x is (B, 3, C, H, W): clean, augmix1, augmix2
+                x_all = x.transpose(0, 1).reshape(-1, *x.shape[2:])
+                x = x[:, 0]
+                if device.type == "cuda":
+                    x_all = x_all.to(memory_format=torch.channels_last)
 
             y_a, y_b, lam = y, y, 1.0
             if mix_on:
@@ -318,8 +350,7 @@ def main():
             with autocast():
                 # teachers see exactly the student's augmented + mixed batch
                 probs = teacher_probs(teachers, x, args.kd_temp, stand) if teachers else None
-                logits = model(x)
-                loss, ce_part, kd_part = compute_loss(logits.float(), y_a, y_b, lam, probs)
+                loss, logits, ce_part, kd_part = forward_loss(x, x_all, y_a, y_b, lam, probs, jsd_w)
             optimizer.zero_grad(set_to_none=True)
             scaler.scale(loss).backward()
 
@@ -332,7 +363,7 @@ def main():
                 bn_stats = [b.clone() for b in raw_model.buffers()]
                 optimizer.zero_grad(set_to_none=True)
                 with autocast():
-                    loss2 = compute_loss(model(x).float(), y_a, y_b, lam, probs)[0]
+                    loss2 = forward_loss(x, x_all, y_a, y_b, lam, probs, jsd_w)[0]
                 scaler.scale(loss2).backward()
                 sam_restore(params, backup)
                 for b, saved in zip(raw_model.buffers(), bn_stats):

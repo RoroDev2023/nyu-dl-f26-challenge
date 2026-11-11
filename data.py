@@ -116,6 +116,24 @@ eval_tf = v2.Compose([
 ])
 
 
+class AugMixViews:
+    """AugMix + JSD views (Hendrycks et al. 2020, google-research/augmix): one shared
+    crop+flip, then the clean view and two independent AugMix views of it.
+    Returns a (3, C, H, W) float tensor. all_ops=False as in the reference code (no
+    brightness/contrast/color/sharpness ops, which overlap the corruption benchmarks)."""
+    def __init__(self, severity=3, width=3, depth=-1, all_ops=False):
+        self.geo = v2.Compose([v2.ToImage(), v2.RandomCrop(32, padding=4, padding_mode="reflect"),
+                               v2.RandomHorizontalFlip()])
+        self.augmix = v2.AugMix(severity=severity, mixture_width=width, chain_depth=depth,
+                                alpha=1.0, all_ops=all_ops)
+        self.norm = v2.Compose([v2.ToDtype(torch.float32, scale=True), v2.Normalize(MEAN, STD)])
+
+    def __call__(self, img):
+        x = self.geo(img)
+        return torch.stack([torch.as_tensor(self.norm(x)), torch.as_tensor(self.norm(self.augmix(x))),
+                            torch.as_tensor(self.norm(self.augmix(x)))])
+
+
 class CIFARDataset(Dataset):
     def __init__(self, x, y=None, transform=None):
         self.x, self.y, self.transform = x, y, transform
@@ -174,13 +192,17 @@ class GPUTrainLoader:
 
 
 def get_loaders(batch_size=128, val_size=5000, num_workers=4, autoaug="none", cutout_size=0,
-                gpu_aug=False, device=None, aug_chunk=16):
+                gpu_aug=False, device=None, aug_chunk=16, augmix_views=False, augmix_severity=3):
     """val_loader is None when val_size == 0 (final run on all 50k).
     The split seed stays fixed on purpose: every student and teacher, whatever its --seed,
     must hold out the same images, or teachers would have trained on the student's val."""
     x, y = load_train()
     xtr, ytr, xva, yva = train_val_split(x, y, val_size)
-    if gpu_aug:
+    if augmix_views:
+        train_loader = DataLoader(CIFARDataset(xtr, ytr, AugMixViews(augmix_severity)),
+                                  batch_size=batch_size, shuffle=True, num_workers=num_workers,
+                                  drop_last=True, pin_memory=torch.cuda.is_available())
+    elif gpu_aug:
         train_loader = GPUTrainLoader(xtr, ytr, batch_size, device, autoaug, cutout_size,
                                       aug_chunk)
     else:
