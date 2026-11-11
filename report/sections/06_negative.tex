@@ -8,6 +8,8 @@ negative at this budget and schedule, and several apparent gains disappear under
 a matched control. Table~\ref{tab:negative} summarizes the results; the text gives
 the context.
 
+
+
 \begin{table*}[t]
 \centering
 \footnotesize
@@ -54,7 +56,7 @@ choice for robustness; we therefore require both clean neutrality and a proxy
 gain before adopting an augmentation.
 
 \paragraph{ASAM and SWA.}
-Figure~\ref{fig:curves}(c) shows the five 60-epoch continuations from A4; none
+Figure~\ref{fig:curves}(d) shows the five 60-epoch continuations from A4; none
 produces a significant gain over the untouched start. A 60-epoch ASAM continuation beats the matched SAM
 continuation by 0.18 points (98.00 vs.\ 97.82, $p=0.049$), but it does not beat
 the untouched A4 start point (97.92; $+0.08$, $p=0.50$). The confirm run from the
@@ -66,7 +68,7 @@ this late continuation, but the continuation itself does not improve the model.
 SWA is neutral (97.80 vs.\ 97.82). A fresh 300-epoch ASAM run changes one image
 (97.64 vs.\ 97.62); applying the 60-epoch ASAM finish to F2s1 changes 33/2,000
 test labels and scores 0.908 public versus 0.911 for the untouched model; the
-corresponding weight soup also scores 0.908. We did not launch fresh 1,200-epoch
+corresponding weight soup also scores 0.908 (Figure~\ref{fig:leaderboard}). We did not launch fresh 1,200-epoch
 ASAM/SWA runs.
 
 \paragraph{LS-KD.}
@@ -99,9 +101,12 @@ statistics are already well matched to the evaluation transform; replacing them
 with clean-image statistics removes the augmentation-induced robustness.
 
 \paragraph{Fresh 300-epoch sweep.}
-A matched 300-epoch sweep found no gain from extra regularization or a different
-KD weight: two-teacher KD is neutral (97.66), KD $\alpha=0.45$ loses 11 images,
-and stochastic depth 0.1 loses 18 (97.30 vs.\ 97.66, $p=0.005$).
+Figure~\ref{fig:curves}(e) shows the fresh alternatives. A matched
+300-epoch sweep found no gain from extra regularization or a different KD weight:
+two-teacher KD is neutral (97.66), KD $\alpha=0.45$ loses 11 images, and
+stochastic depth 0.1 loses 18 (97.30 vs.\ 97.66, $p=0.005$).
+
+
 
 \paragraph{What we did not test.}
 DKD, structural teacher pruning, SE blocks, and fresh 1,200-epoch ASAM/SWA/LS-KD

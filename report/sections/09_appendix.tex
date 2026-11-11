@@ -1,0 +1,57 @@
+\section{Full Run Log}
+\label{sec:appendix}
+
+Table~\ref{tab:runs} lists every run discussed in the paper with the numbers used
+for the figures. All validation numbers use the fixed seed-0 5,000-image holdout;
+``5-crop'' marks the 10-view TTA. Public scores are the Kaggle public leaderboard
+(1,000 images) and are only reported for submitted models.
+
+\begin{table*}[t]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Full run log. Val is EMA accuracy (flip TTA unless marked 5-crop);
+public is the Kaggle public leaderboard. The first block is the main accuracy
+path, the second is KD/architecture, the third is late finishers and failures.}
+\label{tab:runs}
+\begin{tabular}{@{}llcc@{}}
+\toprule
+Run & Setup & Val & Public \\
+\midrule
+\multicolumn{4}{@{}l}{\emph{Main accuracy path}}\\
+Baseline & r3\_64, 200 ep, crop+flip & 94.76 & -- \\
+All tricks & r3\_64, 300 ep, TA+Cutout+mix+SAM+EMA & 97.36 & -- \\
+KD 2 teachers & r3\_64, 600 ep & 97.74 & 0.904 \\
+KD 3 teachers & r3\_64, 600 ep & 97.76 & -- \\
+A4 & r3\_80, 600 ep, 3 teachers & 97.84 / 97.92 (5-crop) & -- \\
+V2 & r3\_80, 1200 ep, 3 teachers & 97.82 / 97.94 (5-crop) & -- \\
+F2s1 & r3\_80, 1200 ep, full data, seed 1 & -- & 0.911 \\
+\midrule
+\multicolumn{4}{@{}l}{\emph{Architecture and KD ablations (300 ep)}}\\
+r3\_64 sweep & 3/5/3, 4.92M & 97.38 & -- \\
+r3\_80 sweep & 2/3/3, 4.88M & 97.62 & -- \\
+r3\_96 sweep & 2/2/2, 4.90M & 97.42 & -- \\
+A3 T=2 & r3\_80, KD temperature 2 & 97.62 & -- \\
+A3 T=1, $\alpha$=1 & r3\_80, KD temperature 1 & 97.50 & -- \\
+\midrule
+\multicolumn{4}{@{}l}{\emph{Late finishers (60 ep from A4, 5-crop)}}\\
+SAM control & C60\_sam & 97.82 & -- \\
+ASAM & C60\_asam & 98.00 & -- \\
+KD $\alpha$=0.45 & C60\_a045 & 97.96 & -- \\
+LS-KD & C60\_lskd & 97.76 & -- \\
+SWA & C60\_swa & 97.80 & -- \\
+\midrule
+\multicolumn{4}{@{}l}{\emph{Fresh alternatives and failures}}\\
+Fresh ASAM & S300\_asam, 300 ep & 97.64 & -- \\
+Fresh LS-KD & F300\_lskd, 300 ep & 97.62 (5-crop) & -- \\
+WRN-40-2 s0 & 2.24M, 300 ep & 97.10 & -- \\
+WRN-40-2 s1 & 2.24M, 300 ep & 97.06 & -- \\
+WRN pair & equal-probability average, 4.49M total & 97.26 & -- \\
+J80 control & 80-ep AugMix control & 97.44 & -- \\
+J80 JSD & 80-ep AugMix+JSD & 96.88 & -- \\
+Test-time BN & F2, BN recomputed on test & 97.34 & 0.884 \\
+Sinkhorn & F2, class-balanced prediction & -- & 0.898 \\
+5-crop TTA & B4 trivial / AugMix & 97.20 / 97.16 & -- \\
+\bottomrule
+\end{tabular}
+\end{table*}

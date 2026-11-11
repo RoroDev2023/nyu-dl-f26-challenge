@@ -18,7 +18,15 @@ consistently better on corrupted and photometric proxies, but not shipped becaus
 its KD confirmation finished after submission selection.
 
 The unresolved question is the roughly ten-point gap between clean validation and
-the private leaderboard. The unlabeled sample we analyzed was not the final
-evaluation set, so we can describe the gap but not explain it. We hope the
+the private leaderboard. We do not have the final evaluation images or labels,
+so we can describe the gap but not explain it. We hope the
 negative results and the explicit separation between proxy evidence and
 leaderboard evidence are useful to others working under similar constraints.
+
+\paragraph{Reproducibility.}
+Every run writes \texttt{args.json}, a per-epoch \texttt{log.csv}, a
+\texttt{results.json}, and a resumable \texttt{last.pt}. The report folder
+contains the archived logs, the fixed figure-generation script, and the AAAI
+style file; every figure can be rebuilt without the competition data or any
+checkpoint. The submitted models are 4.88M and 4.92M parameters, trained from
+scratch with no external data.

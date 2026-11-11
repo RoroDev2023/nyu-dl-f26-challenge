@@ -12,32 +12,24 @@ teacher ensemble's function without inheriting its capacity. Architecture search
 inside the 5M budget was secondary: the best shape is only 0.24 points above the
 baseline shape at 300 epochs.
 
-\paragraph{The gap we could not explain.}
+\paragraph{The unexplained gap.}
 Our best holdout number is 97.94\% (5-crop); the selected submissions scored
 0.911 and 0.904 public, and the team's private score was 0.880. The private score
 is roughly ten points below the holdout number, and the gap between the best
 public score (0.911) and the private score (0.880) is 3.1 points. The
 public/private split is 1,000 images each, so part of the 3.1-point difference is
 sampling noise; the rest could be a harder private subset, a different capture
-distribution, or both. We cannot separate these causes.
-
-The 2,000 unlabeled images released with the starter data looked like natural
-photographs and were clearly unlike CIFAR-10. They motivated a natural-image
-shift hypothesis and a robustness program. They were not, however, the final
-evaluation images. This is the most important methodological lesson of the
-project: a proxy can be visually compelling and statistically well behaved and
-still be the wrong proxy. We should have verified what the released sample was
-before building a narrative around it. The analysis pipeline remains useful
-(it is reproducible and we would reuse it), but its conclusions do not transfer
-to the final test set.
+distribution, or both. We do not have the final evaluation images or labels, so
+we cannot separate these causes. The gap is reported as observed, not as
+something the method was tuned to fix.
 
 \paragraph{Why one-view AugMix was not shipped.}
-One-view AugMix is the one robustness intervention that survived every check we ran: it is
-clean-neutral at 300 epochs, improves the composite by 2.2 points, improves
-photographic jitter by 1.1--1.9 points, replicates across seeds, and keeps its
-effect under three-teacher KD. It was still not in the final submission. The KD
-confirmation finished after the team had selected its submissions; its logs stop
-at epoch 178/300, and the full-data 1,200-epoch AugMix run was never trained.
+One-view AugMix is the one robustness intervention that survived every check we
+ran: it is clean-neutral at 300 epochs, improves the composite by 2.2 points,
+improves photographic jitter by 1.1--1.9 points, replicates across seeds, and
+keeps its effect under three-teacher KD. It was still not in the final submission.
+The KD confirmation finished after the team had selected its submissions; its logs
+stop at epoch 178/300, and the full-data 1,200-epoch AugMix run was never trained.
 Given that the final private gap is unexplained, we cannot claim that shipping
 AugMix would have improved the score. The honest conclusion is that it was the
 best-supported robustness candidate we had, and the submission schedule did not
@@ -47,22 +39,23 @@ allow us to test it at the shipping scale.
 Most comparisons use a single seed; the exceptions are the two AugMix seeds and
 the ASAM confirm. The holdout is 5,000 images, so the seed-to-seed spread is
 0.2--0.4 points and small differences should not be over-interpreted. The B5 KD
-comparison is provisional at 200/300 epochs and was interrupted twice. The
-corruption and photographic proxies are synthetic and label-free; they are stress
-tests, not models of the final shift. The public and private leaderboards are
-1,000 images each, so the leaderboard itself is noisy. We did not run fresh
-1,200-epoch ASAM, SWA, or LS-KD experiments, and we did not test DKD or
-structural teacher pruning. Finally, the full-data models have no unbiased
-validation score, so the final selection relies on the holdout models and the
-team's judgment.
+comparison is provisional at 200/300 epochs and was interrupted twice; its
+partial curves are in Figure~\ref{fig:curves}(f). The corruption and
+photographic proxies are synthetic and label-free; they are stress tests, not
+models of the final shift. The public and private leaderboards are 1,000 images
+each, so the leaderboard itself is noisy. We did not run fresh 1,200-epoch ASAM,
+SWA, or LS-KD experiments, and we did not test DKD or structural teacher pruning.
+Finally, the full-data models have no unbiased validation score, so the final
+selection relies on the holdout models and the team's judgment.
 
 \paragraph{What we would do differently.}
-First, verify what any released test sample actually is before building a shift
-story around it. Second, ablate augmentation at the shipping schedule, not at a cheap pilot: the
+First, ablate augmentation at the shipping schedule, not at a cheap pilot: the
 150-epoch pilot overstated AugMix's effect because the 300-epoch control improved
-so much. Third, keep per-epoch logs for every run in
-the repository; several curves in this paper are missing because the logs stayed
-on a cluster or a cloud volume. Fourth, complete the KD robustness run before
-submission selection, so that a clean-neutral augmentation has a chance to ship.
-Fifth, treat the public leaderboard as a noisy estimate and select by paired
-holdout comparisons, which is what the team did.
+so much. Second, keep per-epoch logs for every run in the repository; several
+curves in this paper are missing because the logs stayed on a cluster or a cloud
+volume. Third, complete the KD robustness run before submission selection, so
+that a clean-neutral augmentation has a chance to ship. Fourth, treat the public
+leaderboard as a noisy estimate and select by paired holdout comparisons, which
+is what the team did. Fifth, run the main comparisons with at least two seeds;
+the single-seed spread is large enough to swallow several of the effects we
+measured.

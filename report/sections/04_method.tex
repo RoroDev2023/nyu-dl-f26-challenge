@@ -18,31 +18,30 @@ evaluated \texttt{r3\_96\_2-2-2} (4.90M), \texttt{r4\_64\_3-3-2-1} (4.89M), and
 \texttt{r3\_40\_8-8-8} (4.72M).
 
 \paragraph{Teachers.}
-We use two WRN-28-10 teachers \citep{zagoruyko2016wide} (36.5M parameters each,
-seeds 0 and 1) and one PyramidNet-110-270 teacher \citep{han2017deep} with
-ShakeDrop (28.5M, seed 2). Teachers are trained for 400
-epochs with the same augmentation recipe but a different seed each; teacher size
-is not constrained by the 5M budget because only the student is submitted. The
-teacher pool reaches 98.14\% holdout accuracy (WRN seeds 0+1); the individual
-teachers reach 98.06, 98.12, and 97.64.
+We use two WRN-28-10 teachers (36.5M parameters each, seeds 0 and 1) and one
+PyramidNet-110-270 teacher with ShakeDrop (28.5M, seed 2). Teachers are trained
+for 400 epochs with the same augmentation recipe but a different seed each;
+teacher size is not constrained by the 5M budget because only the student is
+submitted. The teacher pool reaches 98.14\% holdout accuracy (WRN seeds 0+1); the
+individual teachers reach 98.06, 98.12, and 97.64.
 
 \subsection{Training Recipe}
 
 All students use SGD with Nesterov momentum 0.9, batch size 128, base learning
 rate 0.1, weight decay $5\times10^{-4}$ (not applied to BN affine parameters or
-biases), a 5-epoch linear warmup followed by cosine decay to zero, and bf16 autocast. The default augmentation is random
-crop with 4-pixel padding plus horizontal flip, TrivialAugment
-\citep{muller2021trivialaugment}, Cutout 16 \citep{devries2017cutout}, and per-batch
-mixup \citep{zhang2018mixup} ($\alpha=0.2$) or CutMix \citep{yun2019cutmix}
-($\alpha=1.0$) with probability 1.0. Mixing is disabled for the last 15 epochs of
-300-epoch runs, 30 epochs of 600-epoch runs, and 20 epochs of teacher runs. Label
-smoothing is 0.1 when training from hard labels and is disabled when KD is on.
+biases), a 5-epoch linear warmup followed by cosine decay to zero, and bf16
+autocast. The default augmentation is random crop with 4-pixel padding plus
+horizontal flip, TrivialAugment, Cutout 16, and per-batch mixup ($\alpha=0.2$) or
+CutMix ($\alpha=1.0$) with probability 1.0. Mixing is disabled for the last 15
+epochs of 300-epoch runs, 30 epochs of 600-epoch runs, and 20 epochs of teacher
+runs. Label smoothing is 0.1 when training from hard labels and is disabled when
+KD is on.
 
-SAM \citep{foret2021sharpness} with $\rho=0.05$ costs two forward/backward passes
-per step; the reported SAM runs use it for the whole schedule. EMA with decay
-0.999 is maintained alongside the raw weights, and both are evaluated every
-epoch. The 300-epoch ablation schedule is the shipping schedule for the
-augmentation comparison; the main students use 600 or 1,200 epochs.
+SAM with $\rho=0.05$ costs two forward/backward passes per step; the reported SAM
+runs use it for the whole schedule. EMA with decay 0.999 is maintained alongside
+the raw weights, and both are evaluated every epoch. The 300-epoch ablation
+schedule is the shipping schedule for the augmentation comparison; the main
+students use 600 or 1,200 epochs.
 
 \subsection{Knowledge Distillation}
 
@@ -59,10 +58,9 @@ targets. The two-teacher and three-teacher runs use this loss with
 \texttt{r3\_64}; the selected \texttt{r3\_80} runs use the same loss with all
 three teachers.
 
-We also implement logit-standardized KD (LS-KD,
-\citet{sun2024logit}). Each teacher's logits are z-scored per example before
-softening, the ensemble is averaged in that space, and the student's logits are
-standardized identically. The loss is
+We also implement logit-standardized KD (LS-KD). Each teacher's logits are
+z-scored per example before softening, the ensemble is averaged in that space, and
+the student's logits are standardized identically. The loss is
 $0.1\,\mathrm{CE} + 9\,T^2\,\mathrm{KL}$ with $T=2$. We evaluate LS-KD both as a
 60-epoch continuation and as a fresh 300-epoch run.
 
@@ -71,35 +69,15 @@ $0.1\,\mathrm{CE} + 9\,T^2\,\mathrm{KL}$ with $T=2$. We evaluate LS-KD both as a
 We compare five alternatives to the TrivialAugment control, all at the same
 150-epoch pilot schedule (no SAM, no KD):
 \begin{itemize}
-\item \textbf{RandAugment} \citep{cubuk2020randaugment}, two operations per image.
-\item \textbf{AutoAugment-CIFAR} \citep{cubuk2019autoaugment}, the learned CIFAR
-policy.
+\item \textbf{RandAugment}, two operations per image.
+\item \textbf{AutoAugment-CIFAR}, the learned CIFAR policy.
 \item \textbf{Geometry only}: mild random affine (translation, scale, rotation).
 \item \textbf{Extra affine+color}: stronger affine plus color jitter.
-\item \textbf{AugMix} \citep{hendrycks2021augmix}, the torchvision implementation
-with severity 3 and mixture width 3, one view and no JSD term. This is the
-image-only variant; it does not add the consistency loss.
+\item \textbf{AugMix}: the torchvision implementation with severity 3 and mixture
+width 3, one view and no JSD term. This is the image-only variant; it does not add
+the consistency loss.
 \end{itemize}
 The winner is then evaluated at 300 epochs with SAM, replicated with a second
 seed, and finally tested on top of three-teacher KD. This schedule matters: the
 150-epoch pilot overstates the augmentation effect because the 300-epoch control
 also improves substantially.
-
-\subsection{Shift Analysis and Proxies}
-
-The released unlabeled sample is analyzed with simple photometric statistics
-(brightness, contrast, saturation, sharpness, high-frequency ratio, JPEG
-blockiness, and colorfulness), a nearest-neighbor test, and a visual montage.
-The nearest-neighbor test matches each sample image to all 50,000 training
-images under the 8 dihedral symmetries, and separately under 5 small
-translations with $8\times8$ average pooling. We compare the resulting distance
-distribution to that of genuine CIFAR-10 pairs (holdout vs.\ train) and report the
-fraction of sample images below the 1st percentile of the genuine distribution.
-A transformed CIFAR image would collapse toward zero under one of these
-matchings; genuinely different content should not.
-
-The corrupted and photographic proxies described in Section~\ref{sec:setup} are
-built from the holdout only. They are used as stress tests and as a way to detect
-whether an augmentation improves robustness along a particular axis. They are not
-used to select the final submission, and they are not claimed to model the final
-hidden set.
