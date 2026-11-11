@@ -1,0 +1,185 @@
+\section{Results}
+\label{sec:results}
+
+\subsection{Main Accuracy}
+
+Table~\ref{tab:main} summarizes the accuracy progression. A plain 200-epoch
+student reaches 94.76\% validation accuracy. Adding the full training recipe
+(300 epochs, TrivialAugment, Cutout, mixup/CutMix, SAM, EMA) raises this to
+97.36\%, a gain of 2.6 points. Two-teacher KD adds 0.38 points (97.74\%), and a
+third teacher adds only 0.02 points (97.76\%), which is within noise. Moving to
+the wider \texttt{r3\_80} student and 600 epochs reaches 97.84\% raw and 97.92\%
+under 5-crop TTA. Extending to 1,200 epochs changes the holdout number by
+$-0.02$ raw and $+0.02$ under 5-crop (97.82/97.94), i.e.\ it is not distinguishable
+from 600 epochs on this split.
+
+The full-data models have no unbiased validation score. The public leaderboard
+scores are 0.904 for the two-teacher student and 0.911 for the selected
+\texttt{F2s1} model (5-crop TTA; 0.903 with flip TTA only). The team's private
+score is 0.880, placing 13th. Because both \texttt{F2s1} and the two-teacher
+student were selected as final submissions, the private score cannot be
+attributed to a single model.
+
+A 4.88M student beats the 28.5M PyramidNet teacher (97.64\%) on the holdout, and
+comes within 0.3 points of the best teacher pool (98.14\%). This is the expected effect of distillation with a long schedule and strong
+augmentation: the student inherits the ensemble's function while seeing more
+effective regularization than any single teacher.
+
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\caption{Main results on the fixed 5,000-image holdout and the leaderboard.
+``Val'' is the best reported validation accuracy (raw for baseline, EMA for
+KD/A4/V2, EMA+flip TTA for all tricks); ``5-crop'' is the 10-view TTA described
+in Section~\ref{sec:setup}. Full-data models are trained on
+all 50k images and have no honest validation score. The private 0.880 is the
+team's best of the two selected submissions; both were selected, so the private
+0.880 (13th) is not attributed to a single row.}
+\label{tab:main}
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+Run & Architecture & Params & Epochs & Val & 5-crop & Public / Private \\
+\midrule
+Baseline & \texttt{r3\_64\_3-5-3} & 4.92M & 200 & 94.76 & -- & -- \\
+All tricks, no KD & \texttt{r3\_64\_3-5-3} & 4.92M & 300 & 97.36 & -- & -- \\
+KD, 2 teachers & \texttt{r3\_64\_3-5-3} & 4.92M & 600 & 97.74 & -- & 0.904 / -- \\
+KD, 3 teachers & \texttt{r3\_64\_3-5-3} & 4.92M & 600 & 97.76 & -- & -- \\
+A4 (3 teachers) & \texttt{r3\_80\_2-3-3} & 4.88M & 600 & 97.84 & 97.92 & -- \\
+V2 (3 teachers) & \texttt{r3\_80\_2-3-3} & 4.88M & 1200 & 97.82 & 97.94 & -- \\
+F1 / F2 (full data) & \texttt{r3\_80\_2-3-3} & 4.88M & 1200 & -- & -- & 0.898 / 0.899 \\
+\textbf{F2s1 (selected)} & \texttt{r3\_80\_2-3-3} & 4.88M & 1200 & -- & -- & \textbf{0.911 / --} \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Architecture and Distillation Ablations}
+
+At 300 epochs and with three teachers, the architecture sweep gives 97.38\% for
+\texttt{r3\_64}, 97.42\% for \texttt{r3\_96}, and 97.62\% for \texttt{r3\_80}.
+The wider first stage is worth about 0.24 points over the baseline shape; the
+deeper/narrower alternatives do not help. We therefore use \texttt{r3\_80} for
+the main runs.
+
+The KD hyperparameter sweep is similarly flat. With \texttt{r3\_80} at 300
+epochs, temperature 2 reaches 97.62\% and temperature 1 with $\alpha=1$ reaches
+97.50\%, both no better than the $T=4$ baseline (97.62\%). Two teachers reach
+97.74\% and three reach 97.76\% at 600 epochs; the third teacher adds 0.02
+points, which is smaller than the seed spread. We keep three teachers for the
+main runs because the cost is modest and the ensemble is more stable, but we do
+not claim a real accuracy gain from the third teacher.
+
+\subsection{Robustness and Augmentation}
+
+\paragraph{The 150-epoch pilot.}
+Figure~\ref{fig:b3} compares six policies at the same cheap schedule (150
+epochs, no SAM, no KD). The control (TrivialAugment) reaches 96.48\% clean TTA
+and 84.32\% on the composite proxy. RandAugment (96.50/83.70) and
+AutoAugment-CIFAR (96.62/83.14) are slightly better on clean data and worse on
+the proxy. Geometry-only (95.98/84.96) loses 0.50 clean for 0.64 proxy.
+Affine+color (95.46/84.38) loses clean accuracy without a proxy gain. AugMix is
+the only policy that is clean-neutral (96.52, +0.04) and substantially better on
+the proxy (87.42, +3.10). The pilot motivated the full 300-epoch test, but its
+effect size is inflated: the 300-epoch control also improves a lot.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/fig_b3_pilot.pdf}
+\caption{Augmentation pilot at 150 epochs (no SAM, no KD). Each point is one
+policy; the vertical axis is the composite corruption proxy. AugMix is the only
+policy that is clean-neutral and improves the proxy. The pilot overstates the
+effect because the 300-epoch control is stronger.}
+\label{fig:b3}
+\end{figure}
+
+\paragraph{The 300-epoch test.}
+At 300 epochs with SAM, AugMix and the TrivialAugment control are identical on
+clean validation (EMA 97.08\% both; flip TTA 97.04 vs.\ 97.22). Under the no-TTA
+shifted evaluation, AugMix improves the composite by 2.18 points (89.02 vs.\
+86.84, McNemar $p=3.6\times10^{-9}$), Gaussian noise 0.05 by 4.30, and JPEG-30 by
+5.16. Under flip TTA it improves mild and strong photographic jitter by 1.10 and
+1.38 points ($p\approx10^{-5}$). Geometry alone is where AugMix does
+nothing (+0.06 on $\pm3$-pixel shifts), which is consistent with the gain coming
+from photometric variation rather than framing. A second AugMix seed reproduces
+the effect (+1.80 composite; mean +1.99 across seeds) and keeps clean accuracy
+neutral (96.90\%).
+
+\paragraph{Distillation.}
+The provisional KD check uses the same \texttt{r3\_80} student, three teachers,
+and 300 epochs, changing only \texttt{--autoaug}. In the checkpoint comparison at epoch 200 of 300 (the
+archived logs stop earlier), AugMix is clean-neutral ($-0.12$, $p=0.56$) and
+better on the composite (+2.20, $p=3.7\times10^{-12}$) and strong photographic
+jitter (+1.92, $p=5.6\times10^{-12}$); the geometry proxy moves by +0.36
+($p=0.069$). At that
+point the AugMix arm is level with the 600-epoch A4 model on the composite
+(89.26 vs.\ 89.20) while still about one point behind on clean (96.86 vs.\
+97.84). The effect therefore provisionally survives distillation at roughly the same
+size as in the no-KD comparison. The run was interrupted and the two logs stop at
+epochs 163 and 178 of 300; the comparison is provisional and was not used for
+submission selection.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_val_curves.pdf}
+\caption{Validation curves. (a) B4 augmentation comparison at 300 epochs; the
+AugMix curve is seed 1 because the seed-0 log was not preserved (its final EMA is
+97.08, versus 96.88 for seed 1). Raw accuracy is dashed, EMA is solid. (b) The
+provisional KD arms; logs stop at epochs 163 and 178 of the planned 300, so the
+curves are shown only up to the common epoch.}
+\label{fig:curves}
+\end{figure*}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_robustness.pdf}
+\caption{Clean and shifted accuracy for the 300-epoch B4 arms (EMA weights, no
+TTA). AugMix is clean-neutral and improves the composite, noise, and JPEG
+proxies; the two seeds give +2.18 and +1.80 on the composite. These are label-free
+stress tests, not measurements of the final test set.}
+\label{fig:robustness}
+\end{figure*}
+
+\subsection{Test-Time Augmentation}
+
+Flip TTA is the default. The 10-view 5-crop procedure adds essentially nothing
+on clean data (trivial $-0.02$, AugMix $+0.10$) and is a wash overall: it helps
+on JPEG and the composite by 0.5--1.2 points, but loses on noise and zoom. It
+costs ten times the inference. We nevertheless used 5-crop for the 0.911
+submission because it exactly reproduced the team's accepted CSV; the gain over
+flip is inside leaderboard noise and should not be attributed to TTA.
+
+\subsection{What the Released Sample Showed}
+
+The 2,000 unlabeled images released with the starter data are visibly unlike
+CIFAR-10: they are full-frame photographs with different framing, backgrounds,
+and object scale (Figure~\ref{fig:montage}). On this sample, 0/2,000 are exact
+duplicates of a training image. The photometric differences are small
+(sharpness Cohen's $d=0.27$, contrast $d=0.17$, brightness $d=0.14$, blockiness
+$d=-0.07$), and a nearest-neighbor test finds that the sample sits at or above
+the distance distribution of genuine CIFAR-10 pairs: median 1,982 vs.\ 1,852
+under dihedral matching, and 79.9 vs.\ 73.5 under translation-tolerant pooling;
+0/2,000 fall below the 1st percentile in either test. A brightness/contrast
+change, re-JPEG, flip/rotation, or shift-and-crop of a CIFAR image would collapse
+that residual toward zero; this sample does not.
+
+These observations describe the released sample, not the final evaluation set.
+They motivated the hypothesis that the hidden set contained natural photographs,
+and therefore the decision to prioritize photometric robustness, but the
+hypothesis was never confirmed on the final images. The final leaderboard gap is
+the only direct evidence of a difference: our best holdout model is at 97.94\%
+(5-crop), the selected submissions scored 0.911 and 0.904 public, and the team's
+private score is 0.880. The private score is about ten points below the holdout
+number. We cannot say whether that
+gap is caused by new photographs, a different capture pipeline, a harder class
+mix, or a combination; the released sample cannot adjudicate between them.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_shift_montage.pdf}
+\caption{Top: CIFAR-10 training images. Bottom: the 2,000 unlabeled images
+released with the starter data. These are \emph{not} the final evaluation images;
+they are shown only to document the sample that motivated our robustness
+experiments. The visual difference in framing and scale is why we hypothesized a
+natural-image shift, but the sample cannot explain the final leaderboard gap.}
+\label{fig:montage}
+\end{figure*}

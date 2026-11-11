@@ -1,0 +1,62 @@
+\section{Introduction}
+
+CIFAR-10 is a small-data benchmark that modern architectures have largely
+saturated: with tens of millions of parameters and long schedules, test accuracy
+above 99\% is routine. The problem changes when the model must be trained from
+scratch under a hard budget of five million trainable parameters, and when the
+evaluation set is hidden and may not match the training distribution. Both
+constraints were active in this competition. The first forces careful
+architecture and optimization choices; the second makes validation accuracy an
+imperfect guide and turns the leaderboard into a noisy, partially observed
+signal.
+
+We approached the problem as a two-track collaboration. One track pushed clean
+accuracy through architecture search, long schedules, and knowledge distillation
+(KD) from large teachers trained on the same data. The other track studied
+robustness: it characterized the only unlabeled images available to us, built
+corrupted and photometric proxy validation sets from the training split, and ran
+controlled augmentation ablations. The two tracks shared one codebase, one fixed
+5,000-image holdout, and one set of conventions, so every number in this paper is
+directly comparable.
+
+The main result is a 4.88M-parameter student that reaches 97.84\% clean
+validation accuracy and 97.92\% with 10-view test-time augmentation (TTA). The team's selected
+submissions scored 0.911 and 0.904 on the public leaderboard; the team's private
+score was 0.880, placing 13th. The roughly ten-point gap between
+our best holdout number and the private score is the central unsolved problem of
+the project.
+
+An important caveat shapes how we interpret that gap. The 2,000 unlabeled images
+distributed with the starter data, which we analyzed at length, were not the
+images used for the final leaderboard. Our photometric statistics, nearest-
+neighbor tests, and visual comparisons therefore describe that released sample,
+not the final test set. They motivated the robustness experiments and gave us a
+useful analysis pipeline, but they cannot explain the final score. We report them
+as exploratory evidence and explicitly separate them from the leaderboard
+outcome. The only direct evidence of a distribution difference is the gap between
+validation and leaderboard accuracy itself.
+
+This paper makes four contributions.
+\begin{itemize}
+\item A strong, reproducible 4.88M-parameter recipe: long cosine training, SAM,
+EMA, TrivialAugment, Cutout, mixup/CutMix, and three-teacher KD. It improves a
+plain baseline from 94.76\% to 97.84\% validation (97.92\% with TTA) and yields
+the team's 0.911 public / 0.880 private submissions.
+\item A controlled account of which ingredients mattered. Long schedules and KD
+gave the largest gains; architecture changes within the 5M budget gave small ones;
+several plausible tricks did not pay off.
+\item A clean-neutral augmentation result: AugMix leaves clean accuracy unchanged
+but improves a composite corruption proxy by 2.2pp and a photographic-jitter proxy
+by 1.9pp, replicated across seeds and surviving distillation.
+\item A negative-results and uncertainty report. We document failed techniques
+with paired statistics and validation curves, and we separate proxy evidence from
+evidence about the hidden test set.
+\end{itemize}
+
+Section~\ref{sec:related} reviews related work. Section~\ref{sec:setup} defines
+the protocol. Section~\ref{sec:method} describes the architectures, training
+recipe, KD variants, augmentation policies, and proxy analyses.
+Section~\ref{sec:results} presents accuracy and robustness results.
+Section~\ref{sec:negative} collects the techniques that underperformed.
+Section~\ref{sec:discussion} discusses the gap and limitations;
+Section~\ref{sec:conclusion} concludes.

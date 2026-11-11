@@ -1,0 +1,67 @@
+%File: main.tex
+\documentclass[letterpaper]{article}
+\usepackage{aaai2026}
+\usepackage{times}
+\usepackage{helvet}
+\usepackage{courier}
+\usepackage[hyphens]{url}
+\usepackage{graphicx}
+\usepackage{natbib}
+\usepackage{caption}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{multirow}
+\frenchspacing
+\setlength{\pdfpagewidth}{8.5in}
+\setlength{\pdfpageheight}{11in}
+\setcounter{secnumdepth}{1}
+\pdfinfo{/TemplateVersion (2026.1)}
+\nocopyright
+
+\title{Five Million Parameters on CIFAR-10: What Worked, What Did Not, and an Unexplained Test Gap}
+
+\author{
+  Philip Vetsas\textsuperscript{\rm 1},
+  Rahim Askarov\textsuperscript{\rm 1}
+}
+
+\affiliations{
+  \textsuperscript{\rm 1}NYU Tandon School of Engineering, CS-GY 6923 Deep Learning, Fall 2026\\
+  Team P.R. \quad \{pmv264, ra3716\}@nyu.edu
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We train a 4.88M-parameter ResNet from scratch on CIFAR-10 under a hard 5M
+parameter budget and a hidden evaluation set. Our best
+recipe combines a long cosine schedule, SAM, EMA, and knowledge distillation
+from three auxiliary teachers, reaching 97.84\% clean validation accuracy
+(97.92\% with 10-view TTA). The team's selected submissions scored 0.911 and
+0.904 public; the private score was 0.880, placing 13th. The roughly ten-point gap between
+validation and private accuracy is the central unsolved problem: the unlabeled
+images released with the starter data were not the final evaluation images, so
+our shift analysis is exploratory. We also report what did \emph{not} work:
+RandAugment, AutoAugment-CIFAR, geometry-only and affine+color augmentation,
+ASAM/SWA fine-tuning, logit-standardized KD, a two-model parameter split,
+multi-crop TTA, test-time BN adaptation, Sinkhorn balancing, and seed ensembling.
+AugMix was the one clean-neutral augmentation that consistently improved
+corrupted and photometric proxies, but it was not shipped because its KD
+confirmation finished after submission selection. We argue that negative results
+and explicit uncertainty about the test distribution are as useful as the final
+score.
+\end{abstract}
+
+\input{sections/01_intro}
+\input{sections/02_related}
+\input{sections/03_setup}
+\input{sections/04_method}
+\input{sections/05_results}
+\input{sections/06_negative}
+\input{sections/07_discussion}
+\input{sections/08_conclusion}
+
+\bibliography{references}
+
+\end{document}

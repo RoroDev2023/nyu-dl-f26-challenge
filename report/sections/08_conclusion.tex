@@ -1,0 +1,24 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+We trained a 4.88M-parameter ResNet from scratch on CIFAR-10 and reached 97.84\%
+clean validation accuracy (97.92\% with 10-view TTA). The team's selected
+submissions scored 0.911 and 0.904 public, with a private score of 0.880 and
+13th place. The
+recipe is ordinary in its ingredients---long cosine training, SAM, EMA,
+TrivialAugment, Cutout, mixup/CutMix, and three-teacher KD---but the combination
+is strong at this parameter budget, and the student beats its largest teacher.
+
+The project also produced a useful catalog of negative results. RandAugment,
+AutoAugment-CIFAR, geometry-only and affine+color augmentation, ASAM/SWA
+fine-tuning, logit-standardized KD, a two-model parameter split, multi-crop TTA,
+test-time BN adaptation, Sinkhorn balancing, and seed ensembling all failed to
+improve the metric in our hands. AugMix was the exception: clean-neutral and
+consistently better on corrupted and photometric proxies, but not shipped because
+its KD confirmation finished after submission selection.
+
+The unresolved question is the roughly ten-point gap between clean validation and
+the private leaderboard. The unlabeled sample we analyzed was not the final
+evaluation set, so we can describe the gap but not explain it. We hope the
+negative results and the explicit separation between proxy evidence and
+leaderboard evidence are useful to others working under similar constraints.
