@@ -5,36 +5,43 @@
 
 Table~\ref{tab:main} summarizes the accuracy progression, and
 Figure~\ref{fig:curves}(a) shows the corresponding validation curves. A plain
-200-epoch student reaches 94.76\% validation accuracy. Adding the full training
-recipe (300 epochs, TrivialAugment, Cutout, mixup/CutMix, SAM, EMA) raises this to
-97.36\%, a gain of 2.6 points. Two-teacher KD adds 0.38 points (97.74\%), and a
-third teacher adds only 0.02 points (97.76\%), which is within noise. Moving to
-the wider \texttt{r3\_80} student and 600 epochs reaches 97.84\% raw and 97.92\%
-under 5-crop TTA. Extending to 1,200 epochs changes the holdout number by
-$-0.02$ raw and $+0.02$ under 5-crop (97.82/97.94), i.e.\ it is not distinguishable
-from 600 epochs on this split.
+200-epoch student reaches 94.76\% raw (95.42\% with flip TTA). Adding the full
+training recipe (300 epochs, TrivialAugment, Cutout, mixup/CutMix, SAM, EMA)
+raises the flip-TTA score to 97.36\%, a gain of 1.94 points over the 95.42\%
+baseline; the raw comparison (94.76 to 97.36, +2.6) mixes protocols and also
+includes the 200-to-300-epoch change. Two-teacher KD at 600 epochs reaches
+97.74\%. This is +0.38 over the 300-epoch no-KD run, but the schedule length
+differs, so it is an upper bound on the KD effect rather than a clean KD
+measurement. A third teacher adds only 0.02 points (97.76\%), within noise.
+
+The wider \texttt{r3\_80} student at 600 epochs reaches 97.84\% flip and 97.92\%
+5-crop; extending to 1,200 epochs (V2) gives 97.82/97.94, within noise. On the
+600-epoch main path, \texttt{r3\_80} is only +0.08 over \texttt{r3\_64}
+(97.84 vs.\ 97.76), also within noise; the +0.24 architecture gain is measured
+at 300 epochs, not at the shipping schedule.
 
 The full-data models have no unbiased validation score. The public leaderboard
 scores are 0.904 for the two-teacher student and 0.911 for the selected
 \texttt{F2s1} model (5-crop TTA; 0.903 with flip TTA only). The team's private
-score is 0.880, placing 13th. Because both \texttt{F2s1} and the two-teacher
-student were selected as final submissions, the private score cannot be
-attributed to a single model. Figure~\ref{fig:leaderboard} collects every public
-submission; the selected 0.911 and 0.904 are the best two.
+score is 0.880, placing 13th of 81 teams. Because both \texttt{F2s1} and the
+two-teacher student were selected as final submissions, the private score cannot
+be attributed to a single model. The full-data models have no holdout, so the
+public LB was the final tie-breaker for the selected pair
+(Figure~\ref{fig:leaderboard}).
 
-A 4.88M student beats the 28.5M PyramidNet teacher (97.64\%) on the holdout, and
-comes within 0.3 points of the best teacher pool (98.14\%). This is the expected
-effect of distillation with a long schedule and strong augmentation: the student
-inherits the ensemble's function while seeing more effective regularization than
-any single teacher. Figure~\ref{fig:teachers} compares the teachers and the two
-selected students directly.
+A 4.88M student beats the 28.5M PyramidNet teacher (97.64\%) on the holdout and
+comes within 0.3 points of the best two-teacher pool (98.14\%), but it does not
+beat either 36.5M WRN-28-10 teacher (98.06/98.12). We interpret the result as a
+well-regularized student approximating the teacher ensemble;
+Figure~\ref{fig:teachers} compares them directly.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figures/fig_teacher_student.pdf}
 \caption{Teacher and student holdout accuracy. The 4.88M student is below the
 best teacher pool but above the 28.5M PyramidNet teacher. A4 uses flip TTA and
-V2 uses 5-crop, so the two student bars are not a controlled TTA comparison.}
+V2 uses 5-crop, so the two student bars are not a controlled TTA comparison;
+the x-axis starts at 96\%.}
 \label{fig:teachers}
 \end{figure}
 
@@ -43,25 +50,25 @@ V2 uses 5-crop, so the two student bars are not a controlled TTA comparison.}
 \small
 \setlength{\tabcolsep}{4pt}
 \caption{Main results on the fixed 5,000-image holdout and the leaderboard.
-``Val'' is the best reported validation accuracy (raw for baseline, EMA for
-KD/A4/V2, EMA+flip TTA for all tricks); ``5-crop'' is the 10-view TTA described
-in Section~\ref{sec:setup}. Full-data models are trained on all 50k images and
-have no honest validation score. The private 0.880 is the team's best of the two
-selected submissions; both were selected, so the private 0.880 (13th) is not
-attributed to a single row.}
+``Val'' is EMA + horizontal-flip TTA for every row except the baseline, which is
+raw (95.42 with flip TTA); ``5-crop'' is the 10-view TTA described in
+Section~\ref{sec:setup}. Full-data models have no honest validation score. The
+team's private score is 0.880 (13th of 81), the best of the two selected
+submissions; it is not attributed to a single row.}
 \label{tab:main}
 \begin{tabular}{@{}lcccccc@{}}
 \toprule
-Run & Architecture & Params & Epochs & Val & 5-crop & Public / Private \\
+Run & Architecture & Params & Epochs & Val & 5-crop & Public \\
 \midrule
 Baseline & \texttt{r3\_64\_3-5-3} & 4.92M & 200 & 94.76 & -- & -- \\
 All tricks, no KD & \texttt{r3\_64\_3-5-3} & 4.92M & 300 & 97.36 & -- & -- \\
-KD, 2 teachers & \texttt{r3\_64\_3-5-3} & 4.92M & 600 & 97.74 & -- & 0.904 / -- \\
+KD, 2 teachers & \texttt{r3\_64\_3-5-3} & 4.92M & 600 & 97.74 & -- & 0.904 \\
 KD, 3 teachers & \texttt{r3\_64\_3-5-3} & 4.92M & 600 & 97.76 & -- & -- \\
 A4 (3 teachers) & \texttt{r3\_80\_2-3-3} & 4.88M & 600 & 97.84 & 97.92 & -- \\
 V2 (3 teachers) & \texttt{r3\_80\_2-3-3} & 4.88M & 1200 & 97.82 & 97.94 & -- \\
-F1 / F2 (full data) & \texttt{r3\_80\_2-3-3} & 4.88M & 1200 & -- & -- & 0.898 / 0.899 \\
-\textbf{F2s1 (selected)} & \texttt{r3\_80\_2-3-3} & 4.88M & 1200 & -- & -- & \textbf{0.911 / --} \\
+F1 (full data) & \texttt{r3\_80\_2-3-3} & 4.88M & 1200 & -- & -- & 0.898 \\
+F2 (full data) & \texttt{r3\_80\_2-3-3} & 4.88M & 1200 & -- & -- & 0.899 \\
+\textbf{F2s1 (selected)} & \texttt{r3\_80\_2-3-3} & 4.88M & 1200 & -- & -- & \textbf{0.911} \\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -73,7 +80,7 @@ At 300 epochs and with three teachers, the architecture sweep gives 97.38\% for
 (Figure~\ref{fig:curves}(b)). The wider first stage is worth about 0.24 points
 over the baseline shape; the deeper/narrower alternative does not help. We
 therefore use \texttt{r3\_80} for the main runs. The remaining two presets
-(\texttt{r4\_64} and \texttt{r3\_40}) crashed early and produced no usable curve.
+(\texttt{r4\_64} and \texttt{r3\_40}) produced logs too short for a usable curve.
 
 The KD hyperparameter sweep is similarly flat. With \texttt{r3\_80} at 300
 epochs, temperature 2 reaches 97.62\% and temperature 1 with $\alpha=1$ reaches
@@ -101,8 +108,8 @@ but its effect size is inflated: the 300-epoch control also improves a lot.
 \centering
 \includegraphics[width=\columnwidth]{figures/fig_b3_pilot.pdf}
 \caption{Augmentation pilot at 150 epochs (no SAM, no KD). Each point is one
-policy; the vertical axis is the composite corruption proxy. One-view AugMix is
-the only policy that is clean-neutral and improves the proxy. The pilot
+policy; clean points are TTA and the composite proxy is no-TTA. One-view AugMix
+is the only policy that is clean-neutral and improves the proxy. The pilot
 overstates the effect because the 300-epoch control is stronger.}
 \label{fig:b3}
 \end{figure}
@@ -111,9 +118,10 @@ overstates the effect because the 300-epoch control is stronger.}
 At 300 epochs with SAM, AugMix and the TrivialAugment control are identical on
 clean validation (EMA 97.08\% both; flip TTA 97.04 vs.\ 97.22;
 Figure~\ref{fig:robustness}). Under the no-TTA shifted evaluation, AugMix
-improves the composite by 2.18 points (89.02 vs.\ 86.84, McNemar
-$p=3.6\times10^{-9}$), Gaussian noise 0.05 by 4.30, and JPEG-30 by 5.16. Under
-flip TTA it improves mild and strong photographic jitter by 1.10 and 1.38 points
+improves the composite by 2.18 points (89.02 vs.\ 86.84), Gaussian noise 0.05 by
+4.30, and JPEG-30 by 5.16; the matching flip-TTA paired test gives +2.28 on the
+composite (89.46 vs.\ 87.18, McNemar $p=3.6\times10^{-9}$). Under flip TTA it
+improves mild and strong photographic jitter by 1.10 and 1.38 points
 ($p\approx10^{-5}$). Geometry alone is where AugMix does nothing (+0.06 on
 $\pm3$-pixel shifts), which is consistent with the gain coming from photometric
 variation rather than framing. A second AugMix seed reproduces the effect (+1.80
@@ -137,8 +145,8 @@ for submission selection.
 The B4/B5 variant is image-only, one-view AugMix without the Jensen-Shannon
 consistency term. A separate 80-epoch AugMix+JSD finisher (JSD weight 12, ramped
 over 10 epochs) behaved differently: it gained 2.2 points on the blur proxy
-relative to the matched control but lost about one point on clean validation
-(96.88 vs.\ 97.44 for the control and 97.84 for untouched A4). It failed our
+relative to the matched control but lost 0.56 points on clean validation versus
+that control (96.88 vs.\ 97.44), or 0.96 versus untouched A4 (97.84). It failed our
 clean-accuracy gate and was not submitted. The clean-neutral result should
 therefore be read as specific to the one-view variant at the schedules we tested,
 not to AugMix with JSD.
@@ -148,24 +156,25 @@ not to AugMix with JSD.
 \includegraphics[width=\textwidth]{figures/fig_val_curves.pdf}
 \caption{Validation curves (EMA weights unless noted, no TTA). (a) Main recipe:
 baseline (raw), all tricks, two-teacher KD, A4 (600 epochs), and V2 (1,200
-epochs). (b) Architecture sweep at 300 epochs. (c) KD-temperature/weight sweep;
-the two logs stop at epochs 181 and 183 of 300. (d) 60-epoch continuations from
-A4; the dotted line is the untouched A4 EMA on the same no-TTA evaluation
-(97.72). The finishers stay within 0.35 points of it; none is a significant
-gain. (e) Fresh 300-epoch alternatives: the WRN-40-2 pair, LS-KD, and fresh
-ASAM; late training is shown and none beats the 97.66\% control. (f) The
-provisional KD + AugMix arms; logs stop at epochs 163 and 178 of 300. Final
-flip/5-crop TTA numbers are in Tables~\ref{tab:main} and~\ref{tab:negative}.}
+epochs). (b) Architecture sweep at 300 epochs. (c) KD-temperature/weight sweep.
+(d) 60-epoch continuations from A4; the dotted line is the untouched A4 EMA on
+the same no-TTA evaluation (97.72). The finishers stay within 0.35 points of it;
+none is significant in the paired 5-crop tests (Table~\ref{tab:negative}).
+(e) Fresh alternatives: the two WRN-40-2 models, LS-KD, and fresh ASAM
+(stopped at epoch 268 of 300); late training is shown and none beats the
+97.66\% control. (f) The provisional KD + AugMix arms; logs stop at epochs
+163 and 178 of 300. Final flip/5-crop TTA numbers are in
+Tables~\ref{tab:main}--\ref{tab:runs}.}
 \label{fig:curves}
 \end{figure*}
 
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_robustness.pdf}
-\caption{Clean and shifted accuracy for the 300-epoch B4 arms (EMA weights, no
-TTA). One-view AugMix is clean-neutral and improves the composite, noise, and
-JPEG proxies; the two seeds give +2.18 and +1.80 on the composite. These are
-label-free stress tests built from training images.}
+\caption{B4 augmentation (EMA weights, no TTA). (a) Absolute accuracy.
+(b) AugMix minus the TrivialAugment control: clean is neutral, while the
+composite, noise, and JPEG proxies improve. The two seeds give +2.18 and +1.80
+on the composite. These are label-free stress tests built from training images.}
 \label{fig:robustness}
 \end{figure*}
 
@@ -173,8 +182,8 @@ label-free stress tests built from training images.}
 
 Flip TTA is the default. The 10-view 5-crop procedure adds essentially nothing
 on clean data (trivial $-0.02$, AugMix $+0.10$) and is a wash overall
-(Figure~\ref{fig:tta}): it helps on JPEG and the composite by 0.5--1.2 points, but
-loses on noise and zoom. It costs ten times the inference. We nevertheless used
+(Figure~\ref{fig:tta}): it helps JPEG and the composite by 0.4--1.2 points, is mixed
+on noise, and hurts on zoom. It costs ten times the inference. We nevertheless used
 5-crop for the 0.911 submission because it exactly reproduced the team's accepted
 CSV; the gain over flip is inside leaderboard noise and should not be attributed
 to TTA.
@@ -183,8 +192,9 @@ to TTA.
 \centering
 \includegraphics[width=\columnwidth]{figures/fig_tta_deltas.pdf}
 \caption{5-crop minus flip TTA on the B4 arms. The multi-view policy helps on
-JPEG and the composite, is negligible on clean data, and hurts on noise and zoom;
-the 10$\times$ inference cost is not justified by the clean result.}
+JPEG and the composite, is negligible on clean data, and hurts on zoom; the
+deltas correspond to roughly 1--12 images, so no confidence interval is shown.
+The 10$\times$ inference cost is not justified by the clean result.}
 \label{fig:tta}
 \end{figure}
 
@@ -194,10 +204,11 @@ Figure~\ref{fig:leaderboard} shows every public submission. The selected
 \texttt{F2s1} 5-crop run is the best at 0.911; the two-teacher student is 0.904.
 Late finishers and soups built on \texttt{F2s1} score 0.908, below the untouched
 model, and test-time BN adaptation drops to 0.884. The private score is 0.880 and
-the team finished 13th. The gap between the 97.94\% holdout and the 0.880 private
-score is the central unexplained result: we do not have the final evaluation
-labels or images, so we cannot identify whether it comes from a different capture
-distribution, a harder class mix, or a smaller effective test set. We report it
+the team finished 13th of 81. The gap between the 97.9\% holdout range and the
+0.880 private score is the central unexplained result: we do not have the final
+evaluation labels, and we do not analyze the unlabeled images here, so we cannot
+identify whether the gap comes from a different capture distribution, a harder
+class mix, or a smaller effective test set. We report it
 as observed and do not tune against it.
 
 \begin{figure}[t]
@@ -205,7 +216,8 @@ as observed and do not tune against it.
 \includegraphics[width=\columnwidth]{figures/fig_leaderboard.pdf}
 \caption{All public leaderboard submissions (1,000 images). The selected
 \texttt{F2s1} 5-crop model is the best at 0.911; late ASAM/soup finishers sit at
-0.908 and test-time BN adaptation at 0.884. Public scores carry roughly
-$\pm1.1$pp of noise, so differences of a few images are not a model ranking.}
+0.908 and test-time BN adaptation at 0.884. The x-axis starts at 0.85; public
+scores carry roughly $\pm1$pp of noise, so differences of a few images are not a
+model ranking.}
 \label{fig:leaderboard}
 \end{figure}

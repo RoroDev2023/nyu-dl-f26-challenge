@@ -124,7 +124,7 @@ def curves() -> None:
             continue
         ax.plot(d.epoch, 100 * d.val_acc_ema, color=color, lw=1.0, label=label)
     ax.set_xlabel("epoch")
-    ax.set_xlim(1, 200)
+    ax.set_xlim(1, 300)
     ax.set_ylim(25, 99)
     ax.set_title("(c) KD settings", loc="left", fontsize=7)
     ax.legend(loc="lower right", frameon=False, fontsize=5.0)
@@ -167,6 +167,8 @@ def curves() -> None:
         if d is None:
             continue
         ax.plot(d.epoch, 100 * d.val_acc_ema, color=color, lw=1.0, label=label)
+    ax.axhline(97.66, color="black", lw=0.5, ls=":")
+    ax.text(5, 97.68, "97.66 control", fontsize=4.8, color="black", va="bottom")
     ax.set_xlabel("epoch")
     ax.set_xlim(1, 300)
     ax.set_ylim(96.0, 98.0)
@@ -215,33 +217,64 @@ def robustness() -> None:
     x = np.arange(len(conditions))
     w = 0.8 / len(models)
 
-    fig, ax = plt.subplots(figsize=(7.0, 2.1))
+    fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.2))
+
+    # (a) absolute accuracy
+    ax = axes[0]
     for i, (label, key, color) in enumerate(models):
         vals = [100 * d[key][k] for _, k in conditions]
         bars = ax.bar(x + (i - 1) * w, vals, w, label=label, color=color,
                       edgecolor="white", linewidth=0.4)
         for b, v in zip(bars, vals):
             ax.text(b.get_x() + b.get_width() / 2, v + 1.2, f"{v:.1f}",
-                    ha="center", va="bottom", fontsize=5.5, rotation=90)
+                    ha="center", va="bottom", fontsize=5.0, rotation=90)
     ax.set_xticks(x)
-    ax.set_xticklabels([c for c, _ in conditions])
+    ax.set_xticklabels([c for c, _ in conditions], fontsize=6)
     ax.set_ylabel("accuracy (%)")
     ax.set_ylim(0, 112)
     ax.set_yticks([0, 20, 40, 60, 80, 100])
-    ax.legend(ncol=3, loc="upper right", frameon=False, bbox_to_anchor=(1.0, 1.02))
+    ax.legend(ncol=3, loc="upper right", frameon=False, fontsize=5.2,
+              bbox_to_anchor=(1.0, 1.02))
     ax.grid(axis="y", lw=0.3, alpha=0.5)
-    ax.text(1.0, 101, "+2.2 / +1.8 vs control", ha="center", fontsize=6,
-            color=C_RED)
-    fig.tight_layout()
+    ax.set_title("(a) absolute accuracy", loc="left", fontsize=7)
+
+    # (b) AugMix minus control
+    ax = axes[1]
+    ctrl = "B_trivial_300_sam"
+    for i, (label, key) in enumerate([("s0", "B_augmix_300_sam"),
+                                      ("s1", "B_augmix_300_sam_s1")]):
+        vals = [100 * (d[key][k] - d[ctrl][k]) for _, k in conditions]
+        bars = ax.bar(x + (i - 0.5) * 0.36, vals, 0.36,
+                      color=C_AUG if i == 0 else C_AUG1, label=f"AugMix {label}")
+        for b, v in zip(bars, vals):
+            ax.text(b.get_x() + b.get_width() / 2, v + 0.25, f"{v:+.1f}",
+                    ha="center", va="bottom", fontsize=5.0, rotation=90)
+    ax.axhline(0, color="black", lw=0.6)
+    ax.set_xticks(x)
+    ax.set_xticklabels([c for c, _ in conditions], fontsize=6)
+    ax.set_ylabel("AugMix − control (pp)")
+    ax.set_ylim(-1.5, 15.0)
+    ax.legend(loc="upper left", frameon=False, fontsize=5.4)
+    ax.grid(axis="y", lw=0.3, alpha=0.5)
+    ax.set_title("(b) AugMix minus control", loc="left", fontsize=7)
+
+    fig.tight_layout(w_pad=1.0)
     save(fig, "fig_robustness")
 
 
-# ---------------------------------------------------------------- fig 3: B3 pilot
 def pilot() -> None:
     d = json.loads((DATA / "shift_B3.json").read_text())
-    pts = {k: (100 * v["clean"], 100 * v["combo"]) for k, v in d.items()}
-    # extra affine+color was logged only in STATUS.md
-    pts["B_pilot_extra"] = (95.46, 84.38)
+    # clean = TTA values from STATUS.md; combo = archived no-TTA proxy.
+    clean_tta = {
+        "B_pilot_trivial": 96.48,
+        "B_pilot_randaug": 96.50,
+        "B_pilot_autoaug": 96.62,
+        "B_pilot_geo": 95.98,
+        "B_pilot_extra": 95.46,
+        "B_pilot_augmix": 96.52,
+    }
+    pts = {k: (clean_tta[k], 100 * d[k]["combo"] if k in d else 84.38)
+           for k in clean_tta}
     rows = [
         ("TrivialAug", "B_pilot_trivial", C_GREY),
         ("RandAugment", "B_pilot_randaug", C_RED),
@@ -252,8 +285,8 @@ def pilot() -> None:
     ]
     offsets = {
         "TrivialAug": (7, 4, "left"),
-        "RandAugment": (-7, 5, "right"),
-        "AutoAugment-CIFAR": (-7, -11, "right"),
+        "RandAugment": (-7, 8, "right"),
+        "AutoAugment-CIFAR": (7, -6, "left"),
         "geometry only": (7, 5, "left"),
         "extra affine+color": (7, 4, "left"),
         "one-view AugMix": (7, 4, "left"),
@@ -268,7 +301,7 @@ def pilot() -> None:
                     textcoords="offset points", fontsize=6,
                     ha=ha, va="bottom")
     ax.set_xlabel("clean validation accuracy, TTA (%)")
-    ax.set_ylabel("combo proxy accuracy (%)")
+    ax.set_ylabel("combo proxy accuracy, no TTA (%)")
     ax.set_xlim(95.2, 96.9)
     ax.set_ylim(82.6, 88.2)
     ax.grid(lw=0.3, alpha=0.5)
@@ -291,12 +324,12 @@ def teacher_student() -> None:
     fig, ax = plt.subplots(figsize=(3.45, 2.25))
     y = np.arange(len(rows))
     for yi, (label, val, color) in zip(y, rows):
-        ax.barh(yi, val - 97.0, left=97.0, color=color, height=0.72)
+        ax.barh(yi, val - 96.0, left=96.0, color=color, height=0.72)
         ax.text(val + 0.02, yi, f"{val:.2f}", va="center", fontsize=5.4)
     ax.set_yticks(y)
     ax.set_yticklabels([r[0] for r in rows], fontsize=5.8)
-    ax.set_xlim(97.0, 98.35)
-    ax.set_xticks([97.0, 97.5, 98.0])
+    ax.set_xlim(96.0, 99.0)
+    ax.set_xticks([96.0, 97.0, 98.0, 99.0])
     ax.set_xlabel("holdout accuracy (%)")
     ax.set_title("Teachers and students (5,000 holdout)", loc="left", fontsize=7)
     ax.grid(axis="x", lw=0.3, alpha=0.5)
@@ -351,8 +384,8 @@ def leaderboard() -> None:
     ax.barh(y, vals, color=colors, height=0.72)
     ax.set_yticks(y)
     ax.set_yticklabels(labels, fontsize=5.6)
-    ax.set_xlim(0.875, 0.915)
-    ax.set_xticks([0.88, 0.89, 0.90, 0.91])
+    ax.set_xlim(0.85, 0.92)
+    ax.set_xticks([0.86, 0.88, 0.90, 0.92])
     ax.set_xlabel("public accuracy")
     ax.set_title("Public leaderboard (1,000 images)", loc="left", fontsize=7)
     for yi, v in zip(y, vals):

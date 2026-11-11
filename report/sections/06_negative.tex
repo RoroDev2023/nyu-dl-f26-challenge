@@ -18,7 +18,7 @@ the context.
 5,000-image holdout unless the row uses the public leaderboard. Paired McNemar
 $p$-values are shown where recorded; ``--'' means no paired test was logged.
 Pilot numbers are clean TTA / combo; the B4 comparison is in
-Table~\ref{tab:main}.}
+Figure~\ref{fig:robustness} and Section~\ref{sec:results}.}
 \label{tab:negative}
 \begin{tabular}{@{}p{0.17\textwidth}p{0.42\textwidth}rrp{0.17\textwidth}@{}}
 \toprule
@@ -32,7 +32,7 @@ Extra affine+color & 95.46 / 84.38 vs.\ control & $-1.02$ / $+0.06$ & -- & clean
 \midrule
 \multicolumn{5}{@{}l}{\emph{Optimization and KD}}\\
 ASAM continuation & 98.00 vs.\ 97.82 (SAM) & $+0.18$ & 0.049 & no gain over A4 \\
-LS-KD (300 ep) & 97.62 vs.\ 97.62 (ordinary KD) & $0.00$ & -- & lower NLL only \\
+LS-KD (300 ep) & 97.50 vs.\ 97.62 (flip) & $-0.12$ & -- & no gain; lower NLL \\
 WRN-40-2 pair & 97.26 vs.\ 97.62 (one \texttt{r3\_80}) & $-0.36$ & -- & loses \\
 \midrule
 \multicolumn{5}{@{}l}{\emph{Inference and adaptation}}\\
@@ -40,7 +40,7 @@ WRN-40-2 pair & 97.26 vs.\ 97.62 (one \texttt{r3\_80}) & $-0.36$ & -- & loses \\
 Test-time BN & 0.884 vs.\ 0.899 public & $-1.5$ & -- & hurts \\
 Sinkhorn balance & 0.898 vs.\ 0.899 public & $-0.1$ & -- & no gain \\
 2-seed ensemble & +0.34 combo, +0.44 strong-photo & $+0.3$--$0.4$ & 0.15 / 0.02 & inside noise \\
-Train-split BN & 97.08 / 97.20 vs.\ 97.92 / 97.94 & $-0.8$ / $-0.7$ & -- & hurts \\
+Train-split BN & 97.08 / 97.20 vs.\ 97.84 / 97.82 (flip) & $-0.76$ / $-0.62$ & -- & hurts \\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -58,24 +58,29 @@ gain before adopting an augmentation.
 \paragraph{ASAM and SWA.}
 Figure~\ref{fig:curves}(d) shows the five 60-epoch continuations from A4; none
 produces a significant gain over the untouched start. A 60-epoch ASAM continuation beats the matched SAM
-continuation by 0.18 points (98.00 vs.\ 97.82, $p=0.049$), but it does not beat
+continuation by 0.18 points (98.00 vs.\ 97.82, $p=0.049$; five finishers
+were compared, so this uncorrected $p$ is exploratory), but it does not beat
 the untouched A4 start point (97.92; $+0.08$, $p=0.50$). The confirm run from the
 two-teacher student moves by +1 image against its SAM control and +2 against the
 untouched model ($p=0.83$); pooled over both start points, ASAM versus the
 untouched model is +6 of 10,000 images, but the two comparisons reuse the same
 5,000 images, so this pooled count is exploratory. ASAM is better than SAM for
 this late continuation, but the continuation itself does not improve the model.
-SWA is neutral (97.80 vs.\ 97.82). A fresh 300-epoch ASAM run changes one image
+SWA is neutral under 5-crop (97.80 vs.\ 97.82) but is 0.34 lower on the
+no-TTA curve. A fresh ASAM run (stopped at 268 of 300 epochs) changes one image
 (97.64 vs.\ 97.62); applying the 60-epoch ASAM finish to F2s1 changes 33/2,000
 test labels and scores 0.908 public versus 0.911 for the untouched model; the
-corresponding weight soup also scores 0.908 (Figure~\ref{fig:leaderboard}). We did not launch fresh 1,200-epoch
-ASAM/SWA runs.
+corresponding weight soup also scores 0.908 (Figure~\ref{fig:leaderboard}). No
+completed fresh 1,200-epoch ASAM/SWA run exists; F1200\_asam was stopped at
+epoch 250.
 
 \paragraph{LS-KD.}
 Logit-standardized KD is a calibration intervention in our hands, not an accuracy
-one. The continuation matches ordinary KD (97.76 vs.\ 97.82, within noise) and the
-fresh 300-epoch run matches its ordinary-KD baseline exactly (97.62), while
-substantially lowering validation NLL (0.086 vs.\ 0.154). If the metric rewarded
+one. The continuation matches ordinary KD under 5-crop (97.76 vs.\ 97.82, within
+noise). The fresh run reaches 97.62 5-crop / 97.50 flip, while the archived
+ordinary-KD baseline is 97.62 flip; the protocols differ, so we do not claim an
+accuracy gain. Validation NLL is lower in both cases (0.086 for the continuation
+and 0.092 fresh, versus about 0.15). If the metric rewarded
 calibration, LS-KD would be attractive; for top-1 accuracy it is a wash.
 
 \paragraph{Splitting the budget.}
@@ -96,9 +101,9 @@ ensemble gains +0.34 on the composite ($p=0.15$) and +0.44 on strong photographi
 jitter ($p=0.02$), but the composite gain is not significant and both are inside
 the public-LB noise; we did not use an ensemble for the final submission.
 Train-split BN recalibration (recomputing BN on clean training images) hurts
-badly: 97.08 vs.\ 97.92 for A4 and 97.20 vs.\ 97.94 for V2. The saved BN
-statistics are already well matched to the evaluation transform; replacing them
-with clean-image statistics removes the augmentation-induced robustness.
+under the same flip protocol: 97.08 vs.\ 97.84 for A4 and 97.20 vs.\ 97.82 for
+V2. The augmentation-trained BN statistics are better on our holdout; we do not
+claim that this transfers to the hidden set.
 
 \paragraph{Fresh 300-epoch sweep.}
 Figure~\ref{fig:curves}(e) shows the fresh alternatives. A matched
@@ -109,6 +114,6 @@ stochastic depth 0.1 loses 18 (97.30 vs.\ 97.66, $p=0.005$).
 
 
 \paragraph{What we did not test.}
-DKD, structural teacher pruning, SE blocks, and fresh 1,200-epoch ASAM/SWA/LS-KD
-runs were left untested; they are the most promising follow-ups but did not fit
-the compute budget.
+DKD, structural teacher pruning, and completed fresh 1,200-epoch ASAM/SWA/LS-KD
+runs were left untested. An SE run was launched but never scored. These are the
+most promising follow-ups but did not fit the compute budget.

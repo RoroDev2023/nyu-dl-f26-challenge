@@ -1,32 +1,20 @@
 \section{Conclusion}
 \label{sec:conclusion}
 
-We trained a 4.88M-parameter ResNet from scratch on CIFAR-10 and reached 97.84\%
-clean validation accuracy (97.92\% with 10-view TTA). The team's selected
-submissions scored 0.911 and 0.904 public, with a private score of 0.880 and
-13th place. The
-recipe is ordinary in its ingredients---long cosine training, SAM, EMA,
-TrivialAugment, Cutout, mixup/CutMix, and three-teacher KD---but the combination
-is strong at this parameter budget, and the student beats its largest teacher.
+Our 4.88M-parameter ResNet reaches 97.84\% with flip TTA (97.92\% with 10-view
+TTA). The selected submissions scored 0.911 and 0.904 public; the private score
+was 0.880, 13th of 81 teams. The recipe---long cosine training, SAM, EMA,
+TrivialAugment, Cutout, mixup/CutMix, and three-teacher KD---is strong at this
+budget: the student beats the 28.5M PyramidNet teacher, though not the 36.5M
+WRNs.
 
-The project also produced a useful catalog of negative results. RandAugment,
+The project also produced a negative-results catalog. RandAugment,
 AutoAugment-CIFAR, geometry-only and affine+color augmentation, ASAM/SWA
-fine-tuning, logit-standardized KD, a two-model parameter split, multi-crop TTA,
-test-time BN adaptation, Sinkhorn balancing, and seed ensembling all failed to
-improve the metric in our hands. One-view AugMix was the exception: clean-neutral and
-consistently better on corrupted and photometric proxies, but not shipped because
-its KD confirmation finished after submission selection.
+fine-tuning, logit-standardized KD, a two-model split, multi-crop TTA, test-time
+BN adaptation, Sinkhorn balancing, and seed ensembling produced no significant or
+shipping gain. One-view AugMix was the exception: clean-neutral and better on
+corrupted and photometric proxies, but not shipped because its KD confirmation
+had not finished when submissions were selected.
 
-The unresolved question is the roughly ten-point gap between clean validation and
-the private leaderboard. We do not have the final evaluation images or labels,
-so we can describe the gap but not explain it. We hope the
-negative results and the explicit separation between proxy evidence and
-leaderboard evidence are useful to others working under similar constraints.
-
-\paragraph{Reproducibility.}
-Every run writes \texttt{args.json}, a per-epoch \texttt{log.csv}, a
-\texttt{results.json}, and a resumable \texttt{last.pt}. The report folder
-contains the archived logs, the fixed figure-generation script, and the AAAI
-style file; every figure can be rebuilt without the competition data or any
-checkpoint. The submitted models are 4.88M and 4.92M parameters, trained from
-scratch with no external data.
+The roughly ten-point gap between clean validation and the private leaderboard is
+unexplained: we lack final labels and do not analyze the unlabeled images here.

@@ -43,12 +43,12 @@ need the competition data or any checkpoint. The report figures are:
 3. six-panel validation curves: (a) main recipe, (b) architecture sweep,
    (c) KD settings, (d) 60-epoch finishers, (e) fresh 300-epoch alternatives,
    (f) provisional KD+AugMix
-4. B4 clean/shifted bars
+4. B4 clean/shifted bars and AugMix-minus-control deltas
 5. 5-crop-minus-flip TTA deltas
 6. public leaderboard submissions
 
-The B4 seed-0 AugMix log is still missing, so the B4 figure uses the seed-1
-curve (caption says so). B5 is panel 3(f) and is provisional.
+The B4 figure uses both seed-0 and seed-1 bars from `shift_B4_seeds.json`; the
+B5 panel is provisional.
 
 ## Data provenance
 
@@ -69,14 +69,15 @@ The report deliberately does **not** include an analysis of the 2,000 unlabeled
 sample images. Those images were not the final evaluation images and the earlier
 shift narrative is not used.
 
-Final result (team-provided, 2026-11-11): private score **0.880**, **13th place**;
+Final result (team-provided, 2026-11-11): private score **0.880**, **13th of 81**;
 selected submissions `F2s1_tta5` (0.911 public) and `kd2t` (0.904 public). The
 private score is the team's best of the two selected submissions, and the report
 does not attribute it to a single model.
 
 ## Source of the numbers
 
-- `data/logs/B_trivial_300_sam.csv`, `B_augmix_300_sam_s1.csv`: B4 curves.
+- `data/logs/B_trivial_300_sam.csv`, `B_augmix_300_sam_s1.csv`: B4 seed logs
+  (retained for provenance; the B4 bars use `shift_B4_seeds.json`).
 - `data/logs/B_kd3t_trivial.csv`, `B_kd3t_augmix.csv`: provisional B5 curves.
 - `data/logs/{student_baseline,student_tricks_300,kd_r3_64_2t_600,
   A4_r3_80_600,V2_r3_80_1200}.csv`: main recipe curves.
@@ -84,7 +85,7 @@ does not attribute it to a single model.
   architecture and KD sweeps.
 - `data/logs/C60_*.csv`: 60-epoch finishers.
 - `data/logs/{W40_s0,W40_s1,F300_lskd,S300_asam}.csv`: failed fresh alternatives.
-- `data/shift_B4_300.json`, `shift_B4_seeds.json`: B4 shifted accuracies.
+- `data/shift_B4_seeds.json`: B4 shifted accuracies.
 - `data/shift_B3.json`: 150-epoch augmentation pilot (the `extra affine+color`
   point was logged only in `STATUS.md`, so it is hardcoded in the script).
 - `data/B4_paired.md`, `B5_provisional.md`: paired McNemar tests and the
@@ -93,6 +94,6 @@ does not attribute it to a single model.
 ## Status / open items
 
 - B5 is provisional (200/300 epochs; logs stop at 163/178).
-- The B4 seed-0 curve and the completed B5 logs are still missing.
+- The completed B5 logs are still missing.
 - J80/V300 logs were not in Rahim's push, so those results are table/text only.
 - No checkpoints or competition data are needed to rebuild the current draft.

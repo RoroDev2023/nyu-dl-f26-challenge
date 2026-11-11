@@ -11,9 +11,11 @@ final full-data models are retrained on all 50,000 images once the recipe is
 fixed. No external data and no pretrained weights are used.
 
 \paragraph{Evaluation.}
-The competition metric is top-1 accuracy. The public and private leaderboards each
-use 1,000 hidden images, so a public score near 90\% has a standard error of about
-1.1 percentage points; we do not select models by small public differences. Unless
+The competition metric is top-1 accuracy. The competition divides the 2,000 evaluation
+images into public and private halves (1,000 each), so a public score near 90\%
+has a standard error of about 1 percentage point. We use the holdout for recipe
+selection and treat small public differences as noise; for full-data models
+without a holdout, the public leaderboard is the final tie-breaker. Unless
 stated otherwise, validation numbers use EMA weights. We report raw, EMA, flip
 TTA (average of the image and its horizontal mirror), and 10-view TTA. The latter,
 which we call \emph{5-crop} to match the competition codebase, averages the
@@ -22,8 +24,7 @@ horizontal flip.
 
 \paragraph{Paired statistics.}
 Model comparisons use McNemar's exact test on per-image correctness over the same
-5,000 holdout images. We report the discordant counts and two-sided binomial
-$p$-values. The seed-to-seed spread on this holdout is about 0.2pp on clean data
+5,000 holdout images, with two-sided binomial $p$-values. The seed-to-seed spread on this holdout is about 0.2pp on clean data
 and 0.4pp on the composite proxy, so differences of that size are treated as
 noise.
 
@@ -52,4 +53,4 @@ final test set.
 Main runs used NYU HPC A100 nodes; ablations used A10-class cloud GPUs and a local
 RTX 2070. A 4.9M student takes about 19--21s per epoch on an A10-class GPU;
 three-teacher distillation takes about 59s per epoch. The longest runs (1,200
-epochs on all 50k images) take several hours.
+epochs on all 50k images) take about 20 hours at 59s per epoch.

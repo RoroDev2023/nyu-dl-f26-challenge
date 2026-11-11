@@ -4,12 +4,13 @@
 \subsection{Architectures}
 
 \paragraph{Students.}
-Our student family is a pre-activation bottleneck ResNet. A $3\times3$ stem
+Our student family is a post-activation basic-block ResNet. A $3\times3$ stem
 produces the first stage's channels and keeps the $32\times32$ resolution; three
 stages then use 3/5/3 or 2/3/3 basic blocks, with the first block of stages 2 and
 3 applying stride 2. Each block computes
 $\mathrm{ReLU}(F(x)+S(x))$, where $F$ is conv--BN--ReLU--conv--BN, the last BN is
-zero-initialized so the block starts as an identity, and $S$ is an identity or a
+zero-initialized so the residual branch starts at zero and the block starts close
+to a shortcut, and $S$ is an identity or a
 $1\times1$ conv--BN shortcut when the shape changes. A global average pool and a
 linear layer produce the logits. The two selected presets are
 \texttt{r3\_64\_3-5-3} (64/128/256 channels, 3/5/3 blocks, 4.92M parameters) and
@@ -33,8 +34,8 @@ biases), a 5-epoch linear warmup followed by cosine decay to zero, and bf16
 autocast. The default augmentation is random crop with 4-pixel padding plus
 horizontal flip, TrivialAugment, Cutout 16, and per-batch mixup ($\alpha=0.2$) or
 CutMix ($\alpha=1.0$) with probability 1.0. Mixing is disabled for the last 15
-epochs of 300-epoch runs, 30 epochs of 600-epoch runs, and 20 epochs of teacher
-runs. Label smoothing is 0.1 when training from hard labels and is disabled when
+epochs of 300-epoch runs, 30 epochs of 600-epoch runs, 50 epochs of 1,200-epoch
+runs, and 20 epochs of teacher runs. Label smoothing is 0.1 when training from hard labels and is disabled when
 KD is on.
 
 SAM with $\rho=0.05$ costs two forward/backward passes per step; the reported SAM

@@ -3,59 +3,56 @@
 
 \paragraph{What produced the accuracy.}
 The largest single jump came from the training recipe rather than the
-architecture: the baseline at 94.76\% became 97.36\% with long training,
-TrivialAugment, Cutout, mixup/CutMix, SAM, and EMA. KD added another 0.4 points,
-and the wider student added about 0.2. The 4.88M student ends up better than the
-28.5M PyramidNet teacher and within 0.3 points of the best teacher pool. This is
-consistent with the view that a long, well-regularized student can absorb the
-teacher ensemble's function without inheriting its capacity. Architecture search
-inside the 5M budget was secondary: the best shape is only 0.24 points above the
-baseline shape at 300 epochs.
+architecture: the 95.42\% flip-TTA baseline became 97.36\% with long training,
+TrivialAugment, Cutout, mixup/CutMix, SAM, and EMA. KD at 600 epochs reaches
+97.74\%, but that comparison also changes the schedule, so it is an upper bound
+on the KD effect. The wider student adds 0.24 points at 300 epochs but only 0.08
+on the 600-epoch main path, within noise. The 4.88M student ends up better than
+the 28.5M PyramidNet teacher (97.64\%) and within 0.3 points of the two-teacher
+pool (98.14\%), but it does not beat either 36.5M WRN-28-10 teacher
+(98.06/98.12). Architecture search inside the 5M budget was secondary.
 
 \paragraph{The unexplained gap.}
-Our best holdout number is 97.94\% (5-crop); the selected submissions scored
-0.911 and 0.904 public, and the team's private score was 0.880. The private score
-is roughly ten points below the holdout number, and the gap between the best
-public score (0.911) and the private score (0.880) is 3.1 points. The
-public/private split is 1,000 images each, so part of the 3.1-point difference is
-sampling noise; the rest could be a harder private subset, a different capture
-distribution, or both. We do not have the final evaluation images or labels, so
-we cannot separate these causes. The gap is reported as observed, not as
-something the method was tuned to fix.
+A4 reaches 97.92\% with 5-crop and V2 reaches 97.94\%, a 0.02 difference that is
+not meaningful; we treat the 97.9\% range as the headline holdout result. The
+selected submissions scored 0.911 and 0.904 public, and the team's private score
+was 0.880, 13th of 81. The private score is roughly ten points below the holdout
+range, and the gap between the best public score (0.911) and the private score
+(0.880) is 3.1 points. Because the public and private halves are 1,000 images
+each, part of that difference is sampling noise; the rest could be a harder
+private subset, a different capture distribution, or both. We do not have the
+final evaluation labels, and we do not analyze the provided unlabeled images
+here, so we cannot separate these causes.
 
 \paragraph{Why one-view AugMix was not shipped.}
 One-view AugMix is the one robustness intervention that survived every check we
 ran: it is clean-neutral at 300 epochs, improves the composite by 2.2 points,
 improves photographic jitter by 1.1--1.9 points, replicates across seeds, and
 keeps its effect under three-teacher KD. It was still not in the final submission.
-The KD confirmation finished after the team had selected its submissions; its logs
-stop at epoch 178/300, and the full-data 1,200-epoch AugMix run was never trained.
-Given that the final private gap is unexplained, we cannot claim that shipping
-AugMix would have improved the score. The honest conclusion is that it was the
-best-supported robustness candidate we had, and the submission schedule did not
-allow us to test it at the shipping scale.
+The KD confirmation had not finished when the team selected its submissions; its
+logs stop at epoch 178/300, and the full-data 1,200-epoch AugMix run was never
+trained. Given that the final private gap is unexplained, we cannot claim that
+shipping AugMix would have improved the score. The honest conclusion is that it
+was the best-supported robustness candidate we had, and the submission schedule
+did not allow us to test it at the shipping scale.
 
 \paragraph{Limitations.}
 Most comparisons use a single seed; the exceptions are the two AugMix seeds and
 the ASAM confirm. The holdout is 5,000 images, so the seed-to-seed spread is
 0.2--0.4 points and small differences should not be over-interpreted. The B5 KD
 comparison is provisional at 200/300 epochs and was interrupted twice; its
-partial curves are in Figure~\ref{fig:curves}(f). The corruption and
-photographic proxies are synthetic and label-free; they are stress tests, not
-models of the final shift. The public and private leaderboards are 1,000 images
-each, so the leaderboard itself is noisy. We did not run fresh 1,200-epoch ASAM,
-SWA, or LS-KD experiments, and we did not test DKD or structural teacher pruning.
-Finally, the full-data models have no unbiased validation score, so the final
-selection relies on the holdout models and the team's judgment.
+partial curves are in Figure~\ref{fig:curves}(f). The proxies are synthetic and label-free stress tests, not models of the final
+shift. Both leaderboards are 1,000 images, so they are noisy. We have no completed fresh 1,200-epoch ASAM,
+SWA, or LS-KD run (F1200\_asam stopped at epoch 250), and we did not test DKD or
+structural teacher pruning. Finally, the full-data models have no unbiased
+validation score, so the final selection relies on the holdout models and, for
+the full-data pair, the public leaderboard.
 
 \paragraph{What we would do differently.}
-First, ablate augmentation at the shipping schedule, not at a cheap pilot: the
-150-epoch pilot overstated AugMix's effect because the 300-epoch control improved
-so much. Second, keep per-epoch logs for every run in the repository; several
+First, ablate augmentation at the shipping schedule: the 150-epoch pilot
+overstated AugMix's effect because the 300-epoch control improved so much. Second, keep per-epoch logs for every run in the repository; several
 curves in this paper are missing because the logs stayed on a cluster or a cloud
 volume. Third, complete the KD robustness run before submission selection, so
-that a clean-neutral augmentation has a chance to ship. Fourth, treat the public
-leaderboard as a noisy estimate and select by paired holdout comparisons, which
-is what the team did. Fifth, run the main comparisons with at least two seeds;
-the single-seed spread is large enough to swallow several of the effects we
-measured.
+that a clean-neutral augmentation has a chance to ship. Fourth, run the main
+comparisons with at least two seeds; the single-seed spread is large enough to
+swallow several of the effects we measured.

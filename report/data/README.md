@@ -23,7 +23,6 @@ table copied from the shared repo on 2026-11-11. There is no analysis of the
 | `logs/S300_asam.csv` | `runs/S300_asam/log.csv` | fresh ASAM, stopped at 268 ep |
 | `EXPERIMENTS_main.md` | `origin/main:EXPERIMENTS.md` (commit `e240728`) | Rahim's latest run log |
 | `PROJECT_REPORT_FOR_REVIEW.md` | `origin/main:PROJECT_REPORT_FOR_REVIEW.md` | pre-deadline memo; source for J80/V300/S300 results |
-| `shift_B4_300.json` | `runs/analysis/B4_300/B_shift.json` | B4 clean/shifted accuracies, no TTA |
 | `shift_B4_seeds.json` | `runs/analysis/B4_seeds/B_shift.json` | B4 two-seed comparison, no TTA |
 | `shift_B3.json` | `runs/analysis/B_shift.json` | 150-epoch augmentation pilot |
 | `B4_paired.md` | `runs/analysis/B4_paired.md` | paired McNemar tests, photographic proxies, TTA deltas |
@@ -35,14 +34,13 @@ come from `EXPERIMENTS_main.md` and `PROJECT_REPORT_FOR_REVIEW.md`.
 
 ## Final result
 
-Team-provided (Philip, 2026-11-11): private score 0.880, 13th place. Selected
+Team-provided (Philip, 2026-11-11): private score 0.880, 13th of 81. Selected
 submissions: `F2s1_tta5` (0.911 public) and `kd2t` (0.904 public). The private
 score is the better of the two selected submissions; the report does not
 attribute it to one model.
 
 ## Missing / optional
 
-- `runs/B_augmix_300_sam/log.csv` (completes the B4 seed-0 curve)
 - completed `runs/B_kd3t_{trivial,augmix}/log.csv` and `results.json`
 
 Drop them into `logs/` with the names above and rerun

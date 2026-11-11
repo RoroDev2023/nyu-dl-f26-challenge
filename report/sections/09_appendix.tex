@@ -1,18 +1,17 @@
-\section{Full Run Log}
+\section{Selected Run Log}
 \label{sec:appendix}
 
-Table~\ref{tab:runs} lists every run discussed in the paper with the numbers used
-for the figures. All validation numbers use the fixed seed-0 5,000-image holdout;
+Table~\ref{tab:runs} lists the selected runs used in the figures and tables. All validation numbers use the fixed seed-0 5,000-image holdout;
 ``5-crop'' marks the 10-view TTA. Public scores are the Kaggle public leaderboard
 (1,000 images) and are only reported for submitted models.
 
 \begin{table*}[t]
 \centering
-\footnotesize
+\scriptsize
 \setlength{\tabcolsep}{4pt}
-\caption{Full run log. Val is EMA accuracy (flip TTA unless marked 5-crop);
-public is the Kaggle public leaderboard. The first block is the main accuracy
-path, the second is KD/architecture, the third is late finishers and failures.}
+\caption{Selected run log. Val is EMA accuracy (flip TTA unless marked 5-crop);
+public is the Kaggle public leaderboard. Blocks: main accuracy, architecture/KD,
+late finishers, fresh alternatives/failures.}
 \label{tab:runs}
 \begin{tabular}{@{}llcc@{}}
 \toprule
@@ -42,7 +41,7 @@ LS-KD & C60\_lskd & 97.76 & -- \\
 SWA & C60\_swa & 97.80 & -- \\
 \midrule
 \multicolumn{4}{@{}l}{\emph{Fresh alternatives and failures}}\\
-Fresh ASAM & S300\_asam, 300 ep & 97.64 & -- \\
+Fresh ASAM & S300\_asam, stopped at 268 ep & 97.64 & -- \\
 Fresh LS-KD & F300\_lskd, 300 ep & 97.62 (5-crop) & -- \\
 WRN-40-2 s0 & 2.24M, 300 ep & 97.10 & -- \\
 WRN-40-2 s1 & 2.24M, 300 ep & 97.06 & -- \\
