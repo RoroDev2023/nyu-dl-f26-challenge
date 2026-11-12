@@ -11,8 +11,7 @@ raises the flip-TTA score to 97.36\%, a gain of 1.94 points over the 95.42\%
 baseline; the raw comparison (94.76 to 97.36, +2.6) mixes protocols and also
 includes the 200-to-300-epoch change. Two-teacher KD at 600 epochs reaches
 97.74\%. This is +0.38 over the 300-epoch no-KD run, but the schedule length
-differs, so it is an upper bound on the KD effect rather than a clean KD
-measurement. A third teacher adds only 0.02 points (97.76\%), within noise.
+differs, so the KD effect and the schedule change are confounded. A third teacher adds only 0.02 points (97.76\%), within noise.
 
 The wider \texttt{r3\_80} student at 600 epochs reaches 97.84\% flip and 97.92\%
 5-crop; extending to 1,200 epochs (V2) gives 97.82/97.94, within noise. On the
@@ -23,9 +22,9 @@ at 300 epochs, not at the shipping schedule.
 The full-data models have no unbiased validation score. The public leaderboard
 scores are 0.904 for the two-teacher student and 0.911 for the selected
 \texttt{F2s1} model (5-crop TTA; 0.903 with flip TTA only). The team's private
-score is 0.880, placing 13th of 81 teams. Because both \texttt{F2s1} and the
-two-teacher student were selected as final submissions, the private score cannot
-be attributed to a single model. The full-data models have no holdout, so the
+score is 0.880, placing 13th of 81 teams. Kaggle uses the better private score of the two
+selected submissions: \texttt{F2s1} scored 0.880 private and the two-teacher student 0.876,
+so the final score comes from \texttt{F2s1}. The full-data models have no holdout, so the
 public LB was the final tie-breaker for the selected pair
 (Figure~\ref{fig:leaderboard}).
 
@@ -52,23 +51,23 @@ the x-axis starts at 96\%.}
 \caption{Main results on the fixed 5,000-image holdout and the leaderboard.
 ``Val'' is EMA + horizontal-flip TTA for every row except the baseline, which is
 raw (95.42 with flip TTA); ``5-crop'' is the 10-view TTA described in
-Section~\ref{sec:setup}. Full-data models have no honest validation score. The
-team's private score is 0.880 (13th of 81), the best of the two selected
-submissions; it is not attributed to a single row.}
+Section~\ref{sec:setup}. Full-data models have no honest validation score. Public and
+private are the two 1,000-image Kaggle splits; the final score is \texttt{F2s1}'s 0.880 private (13th of 81).
+The two-teacher run uses WRN seed 0 + PyramidNet.}
 \label{tab:main}
-\begin{tabular}{@{}lcccccc@{}}
+\begin{tabular}{@{}lccccccc@{}}
 \toprule
-Run & Architecture & Params & Epochs & Val & 5-crop & Public \\
+Run & Architecture & Params & Epochs & Val & 5-crop & Public & Private \\
 \midrule
-Baseline & \texttt{r3\_64\_3-5-3} & 4.92M & 200 & 94.76 & -- & -- \\
-All tricks, no KD & \texttt{r3\_64\_3-5-3} & 4.92M & 300 & 97.36 & -- & -- \\
-KD, 2 teachers & \texttt{r3\_64\_3-5-3} & 4.92M & 600 & 97.74 & -- & 0.904 \\
-KD, 3 teachers & \texttt{r3\_64\_3-5-3} & 4.92M & 600 & 97.76 & -- & -- \\
-A4 (3 teachers) & \texttt{r3\_80\_2-3-3} & 4.88M & 600 & 97.84 & 97.92 & -- \\
-V2 (3 teachers) & \texttt{r3\_80\_2-3-3} & 4.88M & 1200 & 97.82 & 97.94 & -- \\
-F1 (full data) & \texttt{r3\_80\_2-3-3} & 4.88M & 1200 & -- & -- & 0.898 \\
-F2 (full data) & \texttt{r3\_80\_2-3-3} & 4.88M & 1200 & -- & -- & 0.899 \\
-\textbf{F2s1 (selected)} & \texttt{r3\_80\_2-3-3} & 4.88M & 1200 & -- & -- & \textbf{0.911} \\
+Baseline & \texttt{r3\_64\_3-5-3} & 4.92M & 200 & 94.76 & -- & -- & -- \\
+All tricks, no KD & \texttt{r3\_64\_3-5-3} & 4.92M & 300 & 97.36 & -- & -- & -- \\
+KD, 2 teachers & \texttt{r3\_64\_3-5-3} & 4.92M & 600 & 97.74 & -- & 0.904 & 0.876 \\
+KD, 3 teachers & \texttt{r3\_64\_3-5-3} & 4.92M & 600 & 97.76 & -- & -- & -- \\
+A4 (3 teachers) & \texttt{r3\_80\_2-3-3} & 4.88M & 600 & 97.84 & 97.92 & -- & -- \\
+V2 (3 teachers) & \texttt{r3\_80\_2-3-3} & 4.88M & 1200 & 97.82 & 97.94 & -- & -- \\
+F1 (full data) & \texttt{r3\_80\_2-3-3} & 4.88M & 600 & -- & -- & 0.898 & 0.879 \\
+F2 (full data) & \texttt{r3\_80\_2-3-3} & 4.88M & 1200 & -- & -- & 0.899 & 0.879 \\
+\textbf{F2s1 (selected)} & \texttt{r3\_80\_2-3-3} & 4.88M & 1200 & -- & -- & \textbf{0.911} & \textbf{0.880} \\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -164,7 +163,7 @@ none is significant in the paired 5-crop tests (Table~\ref{tab:negative}).
 (stopped at epoch 268 of 300); late training is shown and none beats the
 97.66\% control. (f) The provisional KD + AugMix arms; logs stop at epochs
 163 and 178 of 300. Final flip/5-crop TTA numbers are in
-Tables~\ref{tab:main}--\ref{tab:runs}.}
+Tables~\ref{tab:main} and~\ref{tab:negative}.}
 \label{fig:curves}
 \end{figure*}
 
@@ -182,28 +181,21 @@ on the composite. These are label-free stress tests built from training images.}
 
 Flip TTA is the default. The 10-view 5-crop procedure adds essentially nothing
 on clean data (trivial $-0.02$, AugMix $+0.10$) and is a wash overall
-(Figure~\ref{fig:tta}): it helps JPEG and the composite by 0.4--1.2 points, is mixed
+on the B4 arms: it helps JPEG and the composite by 0.4--1.2 points, is mixed
 on noise, and hurts on zoom. It costs ten times the inference. We nevertheless used
 5-crop for the 0.911 submission because it exactly reproduced the team's accepted
 CSV; the gain over flip is inside leaderboard noise and should not be attributed
-to TTA.
+to TTA. On the private split the selected 5-crop file scored 0.880 versus 0.883 for
+flip-only TTA, which confirms this.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\columnwidth]{figures/fig_tta_deltas.pdf}
-\caption{5-crop minus flip TTA on the B4 arms. The multi-view policy helps on
-JPEG and the composite, is negligible on clean data, and hurts on zoom; the
-deltas correspond to roughly 1--12 images, so no confidence interval is shown.
-The 10$\times$ inference cost is not justified by the clean result.}
-\label{fig:tta}
-\end{figure}
+
 
 \subsection{The Leaderboard}
 
 Figure~\ref{fig:leaderboard} shows every public submission. The selected
 \texttt{F2s1} 5-crop run is the best at 0.911; the two-teacher student is 0.904.
 Late finishers and soups built on \texttt{F2s1} score 0.908, below the untouched
-model, and test-time BN adaptation drops to 0.884. The private score is 0.880 and
+model, and the exploratory test-time BN adaptation drops to 0.884. The private score is 0.880 and
 the team finished 13th of 81. The gap between the 97.9\% holdout range and the
 0.880 private score is the central unexplained result: we do not have the final
 evaluation labels, and we do not analyze the unlabeled images here, so we cannot

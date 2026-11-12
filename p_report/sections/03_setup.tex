@@ -10,6 +10,9 @@ predictions on the holdout leak into the student through the soft targets. The
 final full-data models are retrained on all 50,000 images once the recipe is
 fixed. No external data and no pretrained weights are used.
 
+\paragraph{Code and reproduction.}
+The repository linked above contains all training code, every run's arguments and per-epoch log (\texttt{runs/}), the experiment log, the final checkpoint with its SHA-256, and \texttt{report.ipynb}. The notebook prints the parameter count (4,880,474), reloads the final checkpoint, regenerates the submitted CSV with 0 of 2,000 labels different, and recomputes the A4 holdout accuracy (97.92\%, 10-view TTA).
+
 \paragraph{Evaluation.}
 The competition metric is top-1 accuracy. The competition divides the 2,000 evaluation
 images into public and private halves (1,000 each), so a public score near 90\%
@@ -23,7 +26,7 @@ softmax over a center view and four $\pm2$-pixel shifts, each with and without a
 horizontal flip.
 
 \paragraph{Paired statistics.}
-Model comparisons use McNemar's exact test on per-image correctness over the same
+Model comparisons use McNemar's exact test~\citep{mcnemar1947} on per-image correctness over the same
 5,000 holdout images, with two-sided binomial $p$-values. The seed-to-seed spread on this holdout is about 0.2pp on clean data
 and 0.4pp on the composite proxy, so differences of that size are treated as
 noise.
@@ -34,8 +37,8 @@ parameters, trained from scratch on the permitted CIFAR-10 training data, with n
 pretrained weights or external datasets. The evaluation images may not be
 labeled, used for training, or used for model selection. We apply the budget to
 the submitted network; the teachers are auxiliary models trained from scratch on
-the same 50,000 images and are not part of the submitted inference system. The
-team submits a single network per submission.
+the same 45,000 training images (holdout excluded) and are not part of the submitted inference system. The
+team submits a single network per submission. One exploratory submission used test-time BN adaptation (BN statistics re-estimated on the unlabeled evaluation images); it was rejected and is not part of the final model or the selected submissions.
 
 \paragraph{Validation proxies.}
 We build shifted validation sets from the 5,000 holdout images only. The

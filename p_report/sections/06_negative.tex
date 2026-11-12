@@ -56,6 +56,7 @@ choice for robustness; we therefore require both clean neutrality and a proxy
 gain before adopting an augmentation.
 
 \paragraph{ASAM and SWA.}
+ASAM~\citep{kwon2021asam} and SWA~\citep{izmailov2018swa} were tested as late continuations.
 Figure~\ref{fig:curves}(d) shows the five 60-epoch continuations from A4; none
 produces a significant gain over the untouched start. A 60-epoch ASAM continuation beats the matched SAM
 continuation by 0.18 points (98.00 vs.\ 97.82, $p=0.049$; five finishers
@@ -70,7 +71,7 @@ SWA is neutral under 5-crop (97.80 vs.\ 97.82) but is 0.34 lower on the
 no-TTA curve. A fresh ASAM run (stopped at 268 of 300 epochs) changes one image
 (97.64 vs.\ 97.62); applying the 60-epoch ASAM finish to F2s1 changes 33/2,000
 test labels and scores 0.908 public versus 0.911 for the untouched model; the
-corresponding weight soup also scores 0.908 (Figure~\ref{fig:leaderboard}). No
+corresponding weight soup~\citep{wortsman2022soups} also scores 0.908 (Figure~\ref{fig:leaderboard}). No
 completed fresh 1,200-epoch ASAM/SWA run exists; F1200\_asam was stopped at
 epoch 250.
 
@@ -95,8 +96,9 @@ diversity to exploit.
 \paragraph{TTA, adaptation, and ensembling.}
 The 10-view TTA is a wash on clean data and only helps on JPEG/composite proxies;
 flip TTA captures most of it. Test-time BN adaptation, which recomputes BN
-statistics on the evaluation images, drops the public score from 0.899 to 0.884.
-Sinkhorn class balancing is neutral (0.898 vs.\ 0.899). A two-seed AugMix
+statistics on the evaluation images, drops the public score from 0.899 to 0.884
+(one exploratory submission, rejected).
+Sinkhorn class balancing~\citep{cuturi2013sinkhorn} is neutral (0.898 vs.\ 0.899). A two-seed AugMix
 ensemble gains +0.34 on the composite ($p=0.15$) and +0.44 on strong photographic
 jitter ($p=0.02$), but the composite gain is not significant and both are inside
 the public-LB noise; we did not use an ensemble for the final submission.
@@ -108,8 +110,8 @@ claim that this transfers to the hidden set.
 \paragraph{Fresh 300-epoch sweep.}
 Figure~\ref{fig:curves}(e) shows the fresh alternatives. A matched
 300-epoch sweep found no gain from extra regularization or a different KD weight:
-two-teacher KD is neutral (97.66), KD $\alpha=0.45$ loses 11 images, and
-stochastic depth 0.1 loses 18 (97.30 vs.\ 97.66, $p=0.005$).
+two-teacher KD with the two WRNs only is neutral (97.66), KD $\alpha=0.45$ loses 11 images, and
+stochastic depth~\citep{huang2016deep} 0.1 loses 18 (97.30 vs.\ 97.66, $p=0.005$).
 
 
 

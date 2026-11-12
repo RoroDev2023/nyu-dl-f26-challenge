@@ -1,6 +1,6 @@
 \section{Introduction}
 
-CIFAR-10 is a small-image benchmark that modern architectures have largely
+CIFAR-10~\citep{krizhevsky2009} is a small-image benchmark that modern architectures have largely
 saturated: with tens of millions of parameters and long schedules, the remaining
 headroom is small. The problem changes when the model must be trained from
 scratch under a hard budget of five million trainable parameters, and when the
@@ -12,7 +12,7 @@ signal.
 
 We approached the problem as a two-track collaboration. One track pushed clean
 accuracy through architecture search, long schedules, and knowledge distillation
-(KD) from large teachers trained on the same data. The other track studied
+(KD)~\citep{hinton2015distilling} from large teachers trained on the same data. The other track studied
 robustness: it built corrupted and photometric proxy validation sets from the
 training split and ran controlled augmentation ablations. The two tracks shared
 one codebase, one fixed 5,000-image holdout, and one set of conventions; all numbers use
@@ -29,14 +29,13 @@ explain it.
 
 This paper makes four contributions.
 \begin{itemize}
-\item A strong, reproducible 4.88M-parameter recipe: long cosine training, SAM,
-EMA, TrivialAugment, Cutout, mixup/CutMix, and three-teacher KD. It improves a
+\item A strong, reproducible 4.88M-parameter ResNet~\citep{he2016deep} recipe: long cosine training~\citep{loshchilov2017sgdr}, SAM~\citep{foret2021sam},
+EMA, TrivialAugment~\citep{muller2021trivial}, Cutout~\citep{devries2017cutout}, mixup/CutMix~\citep{zhang2018mixup,yun2019cutmix}, and three-teacher KD. It improves a
 flip-TTA baseline from 95.42\% to 97.84\% (97.92\% with 10-view TTA) and yields
 the team's 0.911 public / 0.880 private submissions.
-\item A controlled account of which ingredients mattered. Long schedules and KD
-gave the largest gains; architecture changes within the 5M budget gave small ones;
+\item A controlled account of which ingredients mattered. The training recipe gave the largest gain and KD a smaller, schedule-confounded one; architecture changes within the 5M budget gave small ones;
 several plausible tricks did not pay off.
-\item A clean-neutral augmentation result: one-view AugMix leaves clean accuracy
+\item A clean-neutral augmentation result: one-view AugMix~\citep{hendrycks2020augmix} leaves clean accuracy
 unchanged but improves a composite corruption proxy by 2.2pp and a
 photographic-jitter proxy by 1.9pp, replicated across seeds and surviving
 distillation. A JSD variant did not preserve clean accuracy and was rejected.
@@ -45,11 +44,3 @@ statistics and validation curves: augmentation policies, late continuations,
 fresh 300-epoch sweeps, test-time adaptation, TTA variants, model splitting, and
 seed ensembling.
 \end{itemize}
-
-Section~\ref{sec:setup} defines the protocol. Section~\ref{sec:method} describes
-the architectures, training recipe, KD variants, augmentation policies, and proxy
-analyses. Section~\ref{sec:results} presents accuracy and robustness results.
-Section~\ref{sec:negative} collects the techniques that underperformed.
-Section~\ref{sec:appendix} lists the selected runs and their numbers.
-Section~\ref{sec:discussion} discusses the gap and limitations;
-Section~\ref{sec:conclusion} concludes.

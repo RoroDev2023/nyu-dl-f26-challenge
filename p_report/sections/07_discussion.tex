@@ -5,8 +5,8 @@
 The largest single jump came from the training recipe rather than the
 architecture: the 95.42\% flip-TTA baseline became 97.36\% with long training,
 TrivialAugment, Cutout, mixup/CutMix, SAM, and EMA. KD at 600 epochs reaches
-97.74\%, but that comparison also changes the schedule, so it is an upper bound
-on the KD effect. The wider student adds 0.24 points at 300 epochs but only 0.08
+97.74\%, but that comparison also changes the schedule, so the two effects are
+confounded. The wider student adds 0.24 points at 300 epochs but only 0.08
 on the 600-epoch main path, within noise. The 4.88M student ends up better than
 the 28.5M PyramidNet teacher (97.64\%) and within 0.3 points of the two-teacher
 pool (98.14\%), but it does not beat either 36.5M WRN-28-10 teacher

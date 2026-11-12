@@ -9,7 +9,7 @@ produces the first stage's channels and keeps the $32\times32$ resolution; three
 stages then use 3/5/3 or 2/3/3 basic blocks, with the first block of stages 2 and
 3 applying stride 2. Each block computes
 $\mathrm{ReLU}(F(x)+S(x))$, where $F$ is conv--BN--ReLU--conv--BN, the last BN is
-zero-initialized so the residual branch starts at zero and the block starts close
+zero-initialized~\citep{goyal2017} so the residual branch starts at zero and the block starts close
 to a shortcut, and $S$ is an identity or a
 $1\times1$ conv--BN shortcut when the shape changes. A global average pool and a
 linear layer produce the logits. The two selected presets are
@@ -18,10 +18,25 @@ linear layer produce the logits. The two selected presets are
 evaluated \texttt{r3\_96\_2-2-2} (4.90M), \texttt{r4\_64\_3-3-2-1} (4.89M), and
 \texttt{r3\_40\_8-8-8} (4.72M).
 
+\paragraph{Design choices.}
+Inside the 5M budget a stage costs roughly $B_i C_i^2$ parameters, so depth and
+width trade off directly. We keep $3\times3$ convolutions ($5\times5$ costs
+$2.8\times$ as much, and two stacked $3\times3$ convs already cover a
+$5\times5$ receptive field), $1\times1$ projection shortcuts only where the
+resolution halves (a $3\times3$ shortcut would spend budget on the pass-through
+path), no max-pool in the stem so stage 1 runs at full resolution, and global
+average pooling over the final $8\times8$ map. Wider stages run faster on a GPU
+and give each block more features, but every block is expensive; deeper,
+narrower nets are slower and become thin early (40 channels at full resolution
+for \texttt{r3\_40}). The middle ground \texttt{r3\_80} (8 blocks,
+80--256 channels) beat both the deeper \texttt{r3\_64} (11 blocks) and the
+wider \texttt{r3\_96} (6 blocks) at 300 epochs; that mid-resolution capacity
+matters most is a hypothesis from this small sweep.
+
 \paragraph{Teachers.}
-We use two WRN-28-10 teachers (36.5M parameters each, seeds 0 and 1) and one
-PyramidNet-110-270 teacher with ShakeDrop (28.5M, seed 2). Teachers are trained
-for 400 epochs with the same augmentation recipe but a different seed each;
+We use two WRN-28-10~\citep{zagoruyko2016wide} teachers (36.5M parameters each, seeds 0 and 1) and one
+PyramidNet-110-270~\citep{han2017pyramidal} teacher with ShakeDrop~\citep{yamada2019shakedrop} (28.5M, seed 2). Teachers are trained
+on the 45,000 training images for 400 epochs with the same augmentation recipe and a different seed each; the WRNs use SAM, the PyramidNet does not;
 teacher size is not constrained by the 5M budget because only the student is
 submitted. The teacher pool reaches 98.14\% holdout accuracy (WRN seeds 0+1); the
 individual teachers reach 98.06, 98.12, and 97.64.
@@ -35,7 +50,7 @@ autocast. The default augmentation is random crop with 4-pixel padding plus
 horizontal flip, TrivialAugment, Cutout 16, and per-batch mixup ($\alpha=0.2$) or
 CutMix ($\alpha=1.0$) with probability 1.0. Mixing is disabled for the last 15
 epochs of 300-epoch runs, 30 epochs of 600-epoch runs, 50 epochs of 1,200-epoch
-runs, and 20 epochs of teacher runs. Label smoothing is 0.1 when training from hard labels and is disabled when
+runs, and 20 epochs of teacher runs. Label smoothing~\citep{szegedy2016rethinking} is 0.1 when training from hard labels and is disabled when
 KD is on.
 
 SAM with $\rho=0.05$ costs two forward/backward passes per step; the reported SAM
@@ -47,7 +62,7 @@ students use 600 or 1,200 epochs.
 \subsection{Knowledge Distillation}
 
 For ordinary KD, each teacher sees the same augmented and mixed batch as the
-student, and its softened distribution is computed at temperature $T=4$. The
+student (consistent teaching~\citep{beyer2022patient}), and its softened distribution is computed at temperature $T=4$. The
 teacher distributions are averaged, and the student minimizes
 \begin{equation}
 \mathcal{L} = 0.9\,T^2\,\mathrm{KL}\!\left(\bar{p}_T \,\|\, q_T\right)
@@ -55,11 +70,11 @@ teacher distributions are averaged, and the student minimizes
 \end{equation}
 where $\bar{p}_T$ is the averaged teacher distribution and $q_T$ the student
 distribution at the same temperature. The CE term uses the mixup/CutMix soft
-targets. The two-teacher and three-teacher runs use this loss with
+targets. The two-teacher (WRN seed 0 + PyramidNet) and three-teacher runs use this loss with
 \texttt{r3\_64}; the selected \texttt{r3\_80} runs use the same loss with all
 three teachers.
 
-We also implement logit-standardized KD (LS-KD). Each teacher's logits are
+We also implement logit-standardized KD (LS-KD)~\citep{sun2024logit}. Each teacher's logits are
 z-scored per example before softening, the ensemble is averaged in that space, and
 the student's logits are standardized identically. The loss is
 $0.1\,\mathrm{CE} + 9\,T^2\,\mathrm{KL}$ with $T=2$. We evaluate LS-KD both as a
@@ -70,8 +85,8 @@ $0.1\,\mathrm{CE} + 9\,T^2\,\mathrm{KL}$ with $T=2$. We evaluate LS-KD both as a
 We compare five alternatives to the TrivialAugment control, all at the same
 150-epoch pilot schedule (no SAM, no KD):
 \begin{itemize}
-\item \textbf{RandAugment}, two operations per image.
-\item \textbf{AutoAugment-CIFAR}, the learned CIFAR policy.
+\item \textbf{RandAugment}~\citep{cubuk2020randaugment}, two operations per image.
+\item \textbf{AutoAugment-CIFAR}~\citep{cubuk2019autoaugment}, the learned CIFAR policy.
 \item \textbf{Geometry only}: mild random affine (translation, scale, rotation).
 \item \textbf{Extra affine+color}: stronger affine plus color jitter.
 \item \textbf{AugMix}: the torchvision implementation with severity 3 and mixture
