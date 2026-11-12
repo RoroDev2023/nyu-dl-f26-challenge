@@ -1,5 +1,48 @@
 # nyu-dl-f26-challenge
 
+NYU Tandon Deep Learning (Fall 2026), Project 1. Team: **Rahim Askarov (ra3716), Philip Vetsas (pmv264)**.
+Report: [`report/report.pdf`](report/report.pdf). Plots + final numbers: [`report.ipynb`](report.ipynb).
+Every experiment with its numbers: [`EXPERIMENTS.md`](EXPERIMENTS.md).
+
+## Final result
+
+| | |
+|---|---|
+| Model | ResNet `r3_80_2-3-3`: 3x3 stem, 3 stages of 2/3/3 basic blocks, 80/160/256 channels, 1x1 projection shortcuts, global avg pool, linear |
+| Trainable parameters | **4,880,474** (budget 5,000,000) |
+| Training | 1200 epochs, all 50k images, KD from 3 self-trained teachers, TrivialAugment, Cutout, mixup/CutMix, SAM, EMA |
+| Inference | EMA weights, 10-view TTA (5 shifts x hflip), softmax average |
+| Validation accuracy | **97.92%** (same recipe at 600 epochs, fixed 5000-image holdout) |
+| Kaggle test accuracy | **0.911** (public leaderboard) |
+
+## Reproduce
+
+Data setup: section 4 below. Then (one A100 GPU; times are for an A100):
+
+```bash
+# 1) three teachers, 400 epochs each, same 5000 val images held out (~3 h each)
+python train.py --arch wrn_28_10 --no-budget --epochs 400 --autoaug trivial --cutout 16 \
+  --mixup-alpha 0.2 --cutmix-alpha 1.0 --mix-off-epochs 20 --sam --ema-decay 0.999 --seed 0 --out runs/teacher_wrn_s0
+python train.py --arch wrn_28_10 --no-budget --epochs 400 --autoaug trivial --cutout 16 \
+  --mixup-alpha 0.2 --cutmix-alpha 1.0 --mix-off-epochs 20 --sam --ema-decay 0.999 --seed 1 --out runs/teacher_wrn_s1
+python train.py --arch pyramid_110_270 --no-budget --epochs 400 --autoaug trivial --cutout 16 \
+  --mixup-alpha 0.2 --cutmix-alpha 1.0 --mix-off-epochs 20 --ema-decay 0.999 --seed 2 --out runs/teacher_pyr_s2
+mkdir -p teachers && for t in teacher_wrn_s0 teacher_pyr_s2 teacher_wrn_s1; do cp runs/$t/last.pt teachers/$t.pt; done
+
+# 2) final student: 1200 epochs on all 50k images (~9 h). Use --val-size 5000 --epochs 600 for the validated A4 run.
+python train.py --arch r3_80_2-3-3 --epochs 1200 --val-size 0 --seed 1 --autoaug trivial --cutout 16 \
+  --mixup-alpha 0.2 --cutmix-alpha 1.0 --mix-off-epochs 50 --sam --ema-decay 0.999 \
+  --teachers teachers/teacher_wrn_s0.pt teachers/teacher_pyr_s2.pt teachers/teacher_wrn_s1.pt \
+  --out runs/F2s1_r3_80_1200_full
+
+# 3) submission with 10-view TTA
+python scripts/tta_submit.py runs/F2s1_r3_80_1200_full/last.pt submission.csv --policy 5crop
+```
+
+The exact arguments of every run are in `runs/<run>/args.json`, the per-epoch log in `runs/<run>/log.csv`.
+`report.ipynb` loads the final checkpoint, prints the parameter count, regenerates the submitted CSV
+(0 differing labels) and re-computes the validation accuracy. Checkpoints are too big for git; ask us for them.
+
 ## 1. Overview
 
 NYU Tandon Deep Learning (Fall 2026) Kaggle competition: train a ResNet **from scratch** on
@@ -8,7 +51,7 @@ CIFAR-10 with **<= 5M trainable parameters**, scored on a hidden 2000-image test
 Our approach:
 - Strong augmentation (TrivialAugment, Cutout, mixup/CutMix) + SAM + EMA of the weights.
 - Knowledge distillation from big teachers we train ourselves (WRN-28-10, PyramidNet+ShakeDrop)...
-- ...into a ~4.9M-parameter ResNet student (`r3_64_3-5-3`).
+- ...into a 4.88M-parameter ResNet student (`r3_80_2-3-3`; first version was `r3_64_3-5-3`).
 
 ## 2. Competition rules we must follow
 
@@ -18,7 +61,6 @@ Our approach:
 - Hidden test images are for inference only: no pseudo-labels, no test-time BN adaptation.
 - Validate only on our own split of the train data, never on the official CIFAR-10 test set.
 - 5 Kaggle submissions per day for the **whole team**.
-- The repo stays **private** until the competition ends.
 
 ## 3. Repo layout
 
@@ -114,7 +156,7 @@ which is slow on macOS.
    pip install torch torchvision numpy pandas pillow pyyaml matplotlib
    ```
 
-4. **Clone the private repo** with a GitHub personal access token (classic, `repo` scope).
+4. **Clone the repo.**
    Use it as the password when git asks. `credential.helper store` saves it, so it's asked once:
 
    ```bash
@@ -351,48 +393,9 @@ kaggle competitions submissions -c cifar-10-res-net-architecture-challenge-dl
 
 Always put the run name and val accuracy in the submission message.
 
-## 10. Results so far
+## 10. Results
 
-| Run | Model | Params | Epochs | Tricks | Val % | Public LB |
-|---|---|---|---|---|---|---|
-| kd_r3_64_2t_600 | r3_64_3-5-3 | 4.92M | 600 | KD 2 teachers + all tricks | 97.76 | 0.904 |
-| student_tricks_300 | r3_64_3-5-3 | 4.92M | 300 | all tricks, no KD | 97.36 (EMA+TTA) | - |
-| student_baseline | r3_64_3-5-3 | 4.92M | 200 | crop + flip + label smoothing | 94.76 (95.42 TTA) | - |
-| teacher_wrn_s1 | WRN-28-10 | 36.5M | 400 | teacher | 98.14 | - |
-| teacher_wrn_s0 | WRN-28-10 | 36.5M | 400 | teacher | 98.08 | - |
-| teacher_pyr_s2 | PyramidNet-110 | 28.5M | 400 | teacher | 97.66 | - |
-
-Pending: `kd_r3_64_3t_600` (3 teachers) and the architecture sweep `runs/sweep_kd3t_300_*`.
-Run `python scripts/summarize.py` for the latest.
-
-**Key finding:** the hidden test set is distribution-shifted. Models score 7-11 points lower
-on Kaggle than on our val split (our KD student: 97.76 val -> 0.904 public), and stronger
-models hold up better on the shift. The public LB uses only 1000 images (about ±1 point of
-noise), so never pick models by small public-LB differences.
-
-## 11. Next steps: two tracks
-
-### Track A (Rahim, HPC A100)
-
-- [ ] **A1:** read the architecture sweep (`runs/sweep_kd3t_300_*`) and pick the student shape.
-- [ ] **A2:** 2 vs 3 teachers.
-- [ ] **A3:** KD settings at 300 epochs: `--kd-temp` 1 / 2 / 4, `--kd-alpha` 0.7 / 0.9 / 1.0,
-      `--mix-prob` 0.5 / 1.0.
-- [ ] **A4:** 600 vs 1000 epochs.
-- [ ] **A5:** retrain 1-2 teachers with Track B's robust augmentation.
-- [ ] **A6:** final runs with `--val-size 0`, 2 seeds, then predict + submit.
-
-### Track B (partner, RTX 5000 + own HPC hours)
-
-- [ ] **B1:** characterize the test shift: per-channel mean/std, sharpness, noise. Look at
-      the images, but don't label them.
-- [ ] **B2:** build a "shifted val" by corrupting our 5k val split (noise, blur, JPEG,
-      contrast, color). Report clean + shifted val for every run.
-- [ ] **B3:** robustness augmentation ablations at 150-200 epochs, no KD: AugMix + JSD,
-      stronger RandAugment, noise/blur/JPEG aug, stronger CutMix. Pick by shifted val, as
-      long as clean val drops < 0.3.
-- [ ] **B4:** add the winner as a flag in the same style as the other tricks, on a branch.
-- [ ] **B5:** test it on top of KD (3 teachers, 300 epochs).
+See the table at the top, the report and `EXPERIMENTS.md` (every run, with paired comparisons).
 
 ## 12. Team conventions
 
