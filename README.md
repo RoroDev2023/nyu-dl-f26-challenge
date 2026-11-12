@@ -13,7 +13,7 @@ Every experiment with its numbers: [`EXPERIMENTS.md`](EXPERIMENTS.md).
 | Training | 1200 epochs, all 50k images, KD from 3 self-trained teachers, TrivialAugment, Cutout, mixup/CutMix, SAM, EMA |
 | Inference | EMA weights, 10-view TTA (5 shifts x hflip), softmax average |
 | Validation accuracy | **97.92%** (same recipe at 600 epochs, fixed 5000-image holdout) |
-| Kaggle test accuracy | **0.911** (public leaderboard) |
+| Kaggle test accuracy | **0.880** private leaderboard (final score), 0.911 public |
 
 ## Reproduce
 

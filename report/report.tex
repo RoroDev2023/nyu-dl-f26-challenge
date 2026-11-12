@@ -35,7 +35,7 @@ data. At test time we average the softmax of 10 shifted and flipped views.
 
 \textbf{Summary of findings.}
 \begin{itemize}
-\item \textbf{Final result}: \textbf{91.1\% on the Kaggle public leaderboard}; on our fixed 5,000-image
+\item \textbf{Final result}: \textbf{88.0\% on the private Kaggle leaderboard} (our final score; 91.1\% on the public split); on our fixed 5,000-image
   validation holdout the same recipe reaches \textbf{97.92\%} (600 epochs). A plain ResNet of the same
   size reaches 95.42\%.
 \item Most of the gain came from the training recipe, not the architecture: augmentation + SAM + EMA
@@ -46,7 +46,7 @@ data. At test time we average the softmax of 10 shifted and flipped views.
 \item Many published tricks did not help on top of this recipe when tested against a matched control:
   stochastic depth ($-$18 images, $p{=}.005$), SWA, weight soups, logit-standardized KD,
   test-time BN adaptation, AugMix, and splitting the budget into a two-model ensemble.
-\item Validation accuracy (97.9\%) is far above the test score (91.1\%). We verified the pipeline end to end
+\item Validation accuracy (97.9\%) is far above the test score (88.0\% private, 91.1\% public). We verified the pipeline end to end
   (the notebook reproduces the submitted file label for label); the remaining gap looks like a
   distribution shift between the training data and the hidden test images (Section~\ref{sec:gap}).
 \end{itemize}
@@ -149,7 +149,8 @@ on validation (97.92 vs 97.94\%), and the longer schedule gave our best test sco
 \subsection{Test-time augmentation}
 We reflect-pad each test image by 4 pixels and take five 32$\times$32 windows (centered and shifted by $\pm$2 pixels
 vertically or horizontally), plus the same five windows of the mirrored image, and average the 10 softmax
-outputs. This adds no parameters. On validation it adds +0.08\pt\ over flip-only TTA. Weighting the center views
+outputs. This adds no parameters. On validation it adds +0.08\pt\ over flip-only TTA. On the hidden test set the effect is within noise: for the final model
++0.8\pt\ on the public split (0.911 vs 0.903) but $-$0.3\pt\ on the private split (0.880 vs 0.883). Weighting the center views
 more (50\% or 80\% of the weight) or adding diagonal shifts did not help when tuned on one half of
 validation and checked on the other.
 
@@ -173,7 +174,7 @@ Parameters & \textbf{4,880,474} trainable (budget 5,000,000; teachers not used a
 Training & 1,200 epochs on all 50k images, seed 1; KD from 3 teachers; TA, Cutout, mixup/CutMix, SAM, EMA\\
 Inference & EMA weights, 10-view TTA (5 shifts $\times$ flip), softmax average\\
 Validation accuracy & \textbf{97.92\%} (no TTA 97.72\%, flip TTA 97.84\%)\\
-\textbf{Test accuracy} & \textbf{91.1\%} (Kaggle public leaderboard)\\
+\textbf{Test accuracy} & \textbf{88.0\%} Kaggle private leaderboard (final score); 91.1\% public leaderboard\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -219,30 +220,31 @@ Figure~\ref{fig:ablations} shows the controlled comparisons. Table~\ref{tab:neg}
 
 \begin{table}[t]
 \centering\small
-\caption{Other experiments. Accuracy on validation (10-view TTA, EMA) unless marked as public leaderboard (LB).}
+\caption{Other experiments. Accuracy on validation (10-view TTA, EMA) unless given as Kaggle test scores (public / private split).}
 \label{tab:neg}
 \begin{tabularx}{\linewidth}{lX}
 \toprule
 Experiment & Result\\
 \midrule
 ASAM \cite{kwon2021asam} instead of SAM & +9 images as a 60-epoch continuation ($p{=}.049$), confirmed weakly from a second start point (+1/+4),
-but no continuation beat its \emph{untouched} start model. From scratch (300 ep): +1 image. On the test set, ASAM finish of F2s1: LB 0.908 vs 0.911.\\
+but no continuation beat its \emph{untouched} start model. From scratch (300 ep): +1 image. On the test set, ASAM finish of F2s1: 0.908 / 0.878 vs 0.911 / 0.880.\\
 Stochastic depth 0.1 \cite{huang2016deep} & $-$18 images ($p{=}.005$) and worse calibration: on top of KD + SAM + mixing, extra regularization hurts.\\
 SWA \cite{izmailov2018swa} & 6 cyclic 10-epoch cycles, averaged, BN recomputed: $-$1 image vs control, $-$6 vs start.\\
-Weight soup \cite{wortsman2022soups} & Average of a model and its fine-tuned version: $-$1/$-$3 images; on test 0.908.\\
+Weight soup \cite{wortsman2022soups} & Average of a model and its fine-tuned version: $-$1/$-$3 images; on test 0.908 / 0.880 vs 0.911 / 0.880.\\
 Logit-standardized KD \cite{sun2024logit} & Same accuracy as ordinary KD (97.62 vs 97.62, 300 ep), much better calibration (val NLL 0.09 vs 0.15).\\
 KD $\alpha{=}0.45$; 2 vs 3 teachers & $\alpha{=}0.45$: $-$11 images from scratch. Dropping the PyramidNet teacher: $\pm$0.\\
 Two WRN-40-2 (ensemble) & 2.24M each, 97.10/97.06 alone, 97.26 averaged vs 97.62 for one 4.88M ResNet: one model is better than two half-size models.\\
 AugMix + JSD \cite{hendrycks2020augmix} & 80-ep finish: +0.6\pt\ on blurred validation images but $-$0.6\pt\ on clean images.\\
-Test-time BN adaptation & Re-estimating BN statistics on the test images: val 97.34, LB 0.884 (worse). BN recalibration on clean train images: $-$0.6 to $-$0.8\pt.\\
-Class-balanced prediction & Sinkhorn balancing \cite{cuturi2013sinkhorn} of the test predictions: LB 0.898 vs 0.899.\\
-More epochs & 600$\to$1,200 epochs: 97.92$\to$97.94 (+1 image). A random seed changes 61/2000 test labels and up to 1.3\pt\ on the LB.\\
+Test-time BN adaptation & Re-estimating BN statistics on the test images: val 97.34; test 0.884 / 0.874 vs 0.899 / 0.879 (worse). BN recalibration on clean train images: $-$0.6 to $-$0.8\pt.\\
+Class-balanced prediction & Sinkhorn balancing \cite{cuturi2013sinkhorn} of the test predictions: 0.898 / 0.884 vs 0.899 / 0.879. Better on private only;
+no gain on validation or public, so not selected.\\
+More epochs & 600$\to$1,200 epochs: 97.92$\to$97.94 (+1 image). A random seed changes 61/2000 test labels and up to 1.3\pt\ on the public split.\\
 \bottomrule
 \end{tabularx}
 \end{table}
 
 \subsection{Validation vs.\ test gap}\label{sec:gap}
-Our validation accuracy (97.9\%) is about 7\pt\ above the public test score (91.1\%). We checked the obvious causes:
+Our validation accuracy (97.9\%) is 7--10\pt\ above the test score (91.1\% public, 88.0\% private). We checked the obvious causes:
 no overlap between training and validation images; the exact submission code gives 97.82\% on validation;
 the notebook regenerates the submitted CSV with 0 differing labels; per-class validation accuracy is unremarkable.
 What we did measure is that the test images differ from the training images: they are brighter
@@ -252,6 +254,9 @@ However, simulating these pixel statistics on validation costs only 0.1--0.3\pt.
 test labels, is a content-level shift like CIFAR-10.1 \cite{recht2018cifar}, where re-collected test images cost CIFAR-10 models
 4--10\pt. A consequence is that public LB differences of about $\pm$0.5\pt\ between runs were mostly noise (2,000 images,
 seed variance), so we made decisions on the paired validation tests and used the leaderboard only as a final check.
+The private split confirms how noisy the test scores are: the same model scored 3.1\pt\ lower on private than on public,
+and the two splits ranked our own submissions differently (flip-only TTA and Sinkhorn balancing were slightly better on
+private, worse on public).
 
 \section{Lessons learned}
 \begin{itemize}
@@ -265,7 +270,7 @@ seed variance), so we made decisions on the paired validation tests and used the
   Late ``finishing'' runs from a converged checkpoint never improved on the checkpoint itself.
 \item \textbf{One budget, one model.} Two half-size models averaged lost 0.36\pt\ to one full-size model.
 \item \textbf{Be careful with a small public test set.} With 2,000 test images and a shifted distribution, seed noise on the
-  leaderboard is as large as most real improvements.
+  leaderboard is as large as most real improvements; the public and private splits even ranked our own submissions differently.
 \end{itemize}
 
 \section*{Code}
