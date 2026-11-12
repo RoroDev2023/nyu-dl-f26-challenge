@@ -1,0 +1,55 @@
+\section{Introduction}
+
+CIFAR-10 is a small-image benchmark that modern architectures have largely
+saturated: with tens of millions of parameters and long schedules, the remaining
+headroom is small. The problem changes when the model must be trained from
+scratch under a hard budget of five million trainable parameters, and when the
+evaluation set is hidden and may not match the training distribution. Both
+constraints were active in this competition. The first forces careful
+architecture and optimization choices; the second makes validation accuracy an
+imperfect guide and turns the leaderboard into a noisy, partially observed
+signal.
+
+We approached the problem as a two-track collaboration. One track pushed clean
+accuracy through architecture search, long schedules, and knowledge distillation
+(KD) from large teachers trained on the same data. The other track studied
+robustness: it built corrupted and photometric proxy validation sets from the
+training split and ran controlled augmentation ablations. The two tracks shared
+one codebase, one fixed 5,000-image holdout, and one set of conventions; all numbers use
+the same holdout, and the TTA/EMA protocol is stated wherever it differs.
+
+The main result is a 4.88M-parameter student that reaches 97.84\% with
+horizontal-flip test-time augmentation (TTA) and 97.92\% with 10-view TTA. The
+team's selected submissions scored 0.911 and 0.904 on the public leaderboard;
+the private score was 0.880, placing 13th of 81 teams. The roughly ten-point gap between our
+best holdout number and the private score is the central unsolved problem of the
+project. We do not have the final evaluation labels, and we do not analyze the
+provided unlabeled images here, so we do not tune against the gap or claim to
+explain it.
+
+This paper makes four contributions.
+\begin{itemize}
+\item A strong, reproducible 4.88M-parameter recipe: long cosine training, SAM,
+EMA, TrivialAugment, Cutout, mixup/CutMix, and three-teacher KD. It improves a
+flip-TTA baseline from 95.42\% to 97.84\% (97.92\% with 10-view TTA) and yields
+the team's 0.911 public / 0.880 private submissions.
+\item A controlled account of which ingredients mattered. Long schedules and KD
+gave the largest gains; architecture changes within the 5M budget gave small ones;
+several plausible tricks did not pay off.
+\item A clean-neutral augmentation result: one-view AugMix leaves clean accuracy
+unchanged but improves a composite corruption proxy by 2.2pp and a
+photographic-jitter proxy by 1.9pp, replicated across seeds and surviving
+distillation. A JSD variant did not preserve clean accuracy and was rejected.
+\item A negative-results record. We document failed techniques with paired
+statistics and validation curves: augmentation policies, late continuations,
+fresh 300-epoch sweeps, test-time adaptation, TTA variants, model splitting, and
+seed ensembling.
+\end{itemize}
+
+Section~\ref{sec:setup} defines the protocol. Section~\ref{sec:method} describes
+the architectures, training recipe, KD variants, augmentation policies, and proxy
+analyses. Section~\ref{sec:results} presents accuracy and robustness results.
+Section~\ref{sec:negative} collects the techniques that underperformed.
+Section~\ref{sec:appendix} lists the selected runs and their numbers.
+Section~\ref{sec:discussion} discusses the gap and limitations;
+Section~\ref{sec:conclusion} concludes.

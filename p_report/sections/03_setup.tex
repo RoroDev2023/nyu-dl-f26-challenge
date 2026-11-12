@@ -1,0 +1,56 @@
+\section{Setup and Protocol}
+\label{sec:setup}
+
+\paragraph{Data and splits.}
+We use the 50,000 labeled CIFAR-10 training images (10 classes, $32\times32$
+RGB). A fixed stratified 5,000-image holdout (split seed 0) is used by every
+student and every teacher; the remaining 45,000 images are used for training.
+Teachers and students must hold out the same images, otherwise teacher
+predictions on the holdout leak into the student through the soft targets. The
+final full-data models are retrained on all 50,000 images once the recipe is
+fixed. No external data and no pretrained weights are used.
+
+\paragraph{Evaluation.}
+The competition metric is top-1 accuracy. The competition divides the 2,000 evaluation
+images into public and private halves (1,000 each), so a public score near 90\%
+has a standard error of about 1 percentage point. We use the holdout for recipe
+selection and treat small public differences as noise; for full-data models
+without a holdout, the public leaderboard is the final tie-breaker. Unless
+stated otherwise, validation numbers use EMA weights. We report raw, EMA, flip
+TTA (average of the image and its horizontal mirror), and 10-view TTA. The latter,
+which we call \emph{5-crop} to match the competition codebase, averages the
+softmax over a center view and four $\pm2$-pixel shifts, each with and without a
+horizontal flip.
+
+\paragraph{Paired statistics.}
+Model comparisons use McNemar's exact test on per-image correctness over the same
+5,000 holdout images, with two-sided binomial $p$-values. The seed-to-seed spread on this holdout is about 0.2pp on clean data
+and 0.4pp on the composite proxy, so differences of that size are treated as
+noise.
+
+\paragraph{Rules.}
+The official overview asks for a modified ResNet with at most 5M trainable
+parameters, trained from scratch on the permitted CIFAR-10 training data, with no
+pretrained weights or external datasets. The evaluation images may not be
+labeled, used for training, or used for model selection. We apply the budget to
+the submitted network; the teachers are auxiliary models trained from scratch on
+the same 50,000 images and are not part of the submitted inference system. The
+team submits a single network per submission.
+
+\paragraph{Validation proxies.}
+We build shifted validation sets from the 5,000 holdout images only. The
+corruptions are Gaussian noise ($\sigma=0.05,0.10$), Gaussian blur (radius 1.0,
+2.0), JPEG compression (quality 30), contrast scaling (0.7, 1.3), color
+saturation (1.3), and a composite \emph{combo} (contrast 1.15, brightness 1.05,
+blur 0.5, Gaussian noise $\sigma=0.02$, JPEG 75). The photographic proxies apply
+per-image brightness/contrast/saturation scaling plus a small zoom and rotation:
+\emph{mild} uses $\pm8\%$ brightness/contrast, $\pm12\%$ saturation, zoom 1.05 and
+$\pm3^\circ$; \emph{strong} uses $\pm20\%$, $\pm30\%$, zoom 1.15 and $\pm6^\circ$.
+These are label-free stress tests built from training images, not models of the
+final test set.
+
+\paragraph{Compute.}
+Main runs used NYU HPC A100 nodes; ablations used A10-class cloud GPUs and a local
+RTX 2070. A 4.9M student takes about 19--21s per epoch on an A10-class GPU;
+three-teacher distillation takes about 59s per epoch. The longest runs (1,200
+epochs on all 50k images) take about 20 hours at 59s per epoch.
