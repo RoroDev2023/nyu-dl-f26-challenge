@@ -11,7 +11,7 @@ bibliography: the report is a record of our own runs, not a literature review.
 ## Build
 
 ```bash
-cd report
+cd p_report
 ./build.sh
 ```
 
