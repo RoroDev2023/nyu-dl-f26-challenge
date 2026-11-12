@@ -1,0 +1,14 @@
+main.aux
+main.bbl
+main.blg
+main.fdb_latexmk
+main.fls
+main.log
+main.out
+
+# The report is self-contained: keep the archived logs and source images even
+# though the repository-level .gitignore excludes data/ and *.png.
+!data/
+!data/**
+!figures/*.png
+!figures/source/*.png

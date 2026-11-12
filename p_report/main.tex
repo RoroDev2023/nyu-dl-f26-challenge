@@ -1,0 +1,64 @@
+%File: main.tex
+\documentclass[letterpaper]{article}
+\usepackage{aaai2026}
+\usepackage{times}
+\usepackage{helvet}
+\usepackage{courier}
+\usepackage[hyphens]{url}
+\usepackage{graphicx}
+\usepackage{natbib}
+\usepackage{caption}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{multirow}
+\frenchspacing
+\setlength{\pdfpagewidth}{8.5in}
+\setlength{\pdfpageheight}{11in}
+\setcounter{secnumdepth}{1}
+\pdfinfo{/TemplateVersion (2026.1)}
+\nocopyright
+
+\title{Five Million Parameters on CIFAR-10: What Worked, What Did Not, and an Unexplained Test Gap}
+
+\author{
+  Philip Vetsas,
+  Rahim Askarov
+}
+
+\affiliations{
+  NYU Tandon School of Engineering, CS-GY 6953 Deep Learning, Fall 2026\\
+  Team P.R.: pmv264, ra3716
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We train a 4.88M-parameter ResNet from scratch on CIFAR-10 under a hard 5M
+parameter budget and a hidden evaluation set. Our best recipe combines a long
+cosine schedule, SAM, EMA, and knowledge distillation from three auxiliary
+teachers, reaching 97.84\% with flip TTA (97.92\% with 10-view TTA).
+The team's selected submissions scored 0.911 and 0.904 on the public leaderboard;
+the private score was 0.880, placing 13th of 81 teams. The roughly ten-point gap between
+validation and private accuracy is unexplained, and we report it as observed
+rather than optimizing against it. We focus on measured training experiments:
+long schedules and the full training recipe give the largest gains; KD adds a
+smaller, schedule-confounded amount; architecture changes inside the 5M budget
+give small ones; and a long list of plausible techniques did not work.
+One-view AugMix was clean-neutral at 300 epochs and improved corrupted and
+photometric proxies, but it was not shipped because its KD confirmation had not
+finished when submissions were selected; an AugMix+JSD variant traded clean accuracy for blur
+robustness and was rejected. We document the failed techniques with paired
+statistics and validation curves.
+\end{abstract}
+
+\input{sections/01_intro}
+\input{sections/03_setup}
+\input{sections/04_method}
+\input{sections/05_results}
+\input{sections/06_negative}
+\input{sections/09_appendix}
+\input{sections/07_discussion}
+\input{sections/08_conclusion}
+
+\end{document}
