@@ -31,7 +31,7 @@ Geometry only & 95.98 / 84.96 vs.\ control & $-0.50$ / $+0.64$ & -- & clean drop
 Extra affine+color & 95.46 / 84.38 vs.\ control & $-1.02$ / $+0.06$ & -- & clean drop \\
 \midrule
 \multicolumn{5}{@{}l}{\emph{Optimization and KD}}\\
-ASAM continuation & 98.00 vs.\ 97.82 (SAM) & $+0.18$ & 0.049 & no gain over A4 \\
+ASAM continuation & 98.00 vs.\ 97.82 (SAM) & $+0.18$ & 0.049 & no significant gain over A4 \\
 LS-KD (300 ep) & 97.50 vs.\ 97.62 (flip) & $-0.12$ & -- & no gain; lower NLL \\
 WRN-40-2 pair & 97.26 vs.\ 97.62 (one \texttt{r3\_80}) & $-0.36$ & -- & loses \\
 \midrule
@@ -50,10 +50,7 @@ RandAugment and AutoAugment-CIFAR are clean-neutral or slightly positive, but bo
 make the composite proxy worse than the TrivialAugment control. Geometry-only
 augmentation trades 0.50 clean points for 0.64 proxy points, which fails our
 clean-drop budget; affine+color loses 1.02 clean points with no proxy gain.
-AugMix is the exception and is discussed in Section~\ref{sec:results}. The lesson
-is that a policy can look competitive on clean validation and still be the wrong
-choice for robustness; we therefore require both clean neutrality and a proxy
-gain before adopting an augmentation.
+AugMix is the exception and is discussed in Section~\ref{sec:results}.
 
 \paragraph{ASAM and SWA.}
 ASAM~\citep{kwon2021asam} and SWA~\citep{izmailov2018swa} were tested as late continuations.
@@ -63,10 +60,8 @@ continuation by 0.18 points (98.00 vs.\ 97.82, $p=0.049$; five finishers
 were compared, so this uncorrected $p$ is exploratory), but it does not beat
 the untouched A4 start point (97.92; $+0.08$, $p=0.50$). The confirm run from the
 two-teacher student moves by +1 image against its SAM control and +2 against the
-untouched model ($p=0.83$); pooled over both start points, ASAM versus the
-untouched model is +6 of 10,000 images, but the two comparisons reuse the same
-5,000 images, so this pooled count is exploratory. ASAM is better than SAM for
-this late continuation, but the continuation itself does not improve the model.
+untouched model ($p=0.83$). ASAM is better than SAM for
+this late continuation, but the continuation itself gives no statistically significant gain over the untouched model.
 SWA is neutral under 5-crop (97.80 vs.\ 97.82) but is 0.34 lower on the
 no-TTA curve. A fresh ASAM run (stopped at 268 of 300 epochs) changes one image
 (97.64 vs.\ 97.62); applying the 60-epoch ASAM finish to F2s1 changes 33/2,000
@@ -76,13 +71,11 @@ completed fresh 1,200-epoch ASAM/SWA run exists; F1200\_asam was stopped at
 epoch 250.
 
 \paragraph{LS-KD.}
-Logit-standardized KD is a calibration intervention in our hands, not an accuracy
-one. The continuation matches ordinary KD under 5-crop (97.76 vs.\ 97.82, within
+Logit-standardized KD reduced validation NLL without improving top-1 accuracy in our hands. The continuation matches ordinary KD under 5-crop (97.76 vs.\ 97.82, within
 noise). The fresh run reaches 97.62 5-crop / 97.50 flip, while the archived
 ordinary-KD baseline is 97.62 flip; the protocols differ, so we do not claim an
 accuracy gain. Validation NLL is lower in both cases (0.086 for the continuation
-and 0.092 fresh, versus about 0.15). If the metric rewarded
-calibration, LS-KD would be attractive; for top-1 accuracy it is a wash.
+and 0.092 fresh, versus about 0.15). We did not measure calibration directly; for top-1 accuracy it is a wash.
 
 \paragraph{Splitting the budget.}
 Two WRN-40-2 models (2.24M each, 4.49M together) reach 97.10 and 97.08

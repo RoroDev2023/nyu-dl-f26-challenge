@@ -115,7 +115,7 @@ overstates the effect because the 300-epoch control is stronger.}
 
 \paragraph{The 300-epoch test.}
 At 300 epochs with SAM, AugMix and the TrivialAugment control are identical on
-clean validation (EMA 97.08\% both; flip TTA 97.04 vs.\ 97.22;
+clean validation (EMA 97.08\% both; flip TTA 97.06 vs.\ 97.22 in the paired evaluation, 97.04 in the run's own end-of-training log;
 Figure~\ref{fig:robustness}). Under the no-TTA shifted evaluation, AugMix
 improves the composite by 2.18 points (89.02 vs.\ 86.84), Gaussian noise 0.05 by
 4.30, and JPEG-30 by 5.16; the matching flip-TTA paired test gives +2.28 on the
@@ -173,7 +173,7 @@ Tables~\ref{tab:main} and~\ref{tab:negative}.}
 \caption{B4 augmentation (EMA weights, no TTA). (a) Absolute accuracy.
 (b) AugMix minus the TrivialAugment control: clean is neutral, while the
 composite, noise, and JPEG proxies improve. The two seeds give +2.18 and +1.80
-on the composite. These are label-free stress tests built from training images.}
+on the composite. These are synthetic corruptions of the labeled holdout.}
 \label{fig:robustness}
 \end{figure*}
 
@@ -182,7 +182,7 @@ on the composite. These are label-free stress tests built from training images.}
 Flip TTA is the default. The 10-view 5-crop procedure adds essentially nothing
 on clean data (trivial $-0.02$, AugMix $+0.10$) and is a wash overall
 on the B4 arms: it helps JPEG and the composite by 0.4--1.2 points, is mixed
-on noise, and hurts on zoom. It costs ten times the inference. We nevertheless used
+on noise, and hurts on zoom. Ten-view TTA requires five times as many forward passes as two-view flip TTA, or ten times as many as single-view inference. We nevertheless used
 5-crop for the 0.911 submission because it exactly reproduced the team's accepted
 CSV; the gain over flip is inside leaderboard noise and should not be attributed
 to TTA. On the private split the selected 5-crop file scored 0.880 versus 0.883 for

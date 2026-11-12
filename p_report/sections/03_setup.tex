@@ -11,7 +11,7 @@ final full-data models are retrained on all 50,000 images once the recipe is
 fixed. No external data and no pretrained weights are used.
 
 \paragraph{Code and reproduction.}
-The repository linked above contains all training code, every run's arguments and per-epoch log (\texttt{runs/}), the experiment log, the final checkpoint with its SHA-256, and \texttt{report.ipynb}. The notebook prints the parameter count (4,880,474), reloads the final checkpoint, regenerates the submitted CSV with 0 of 2,000 labels different, and recomputes the A4 holdout accuracy (97.92\%, 10-view TTA).
+The repository linked above contains the training code, the available run configurations and per-epoch logs (\texttt{runs/}; some cloud runs were lost, see Section~\ref{sec:discussion}), the experiment log, the final checkpoint (\texttt{KEEP/F2s1.pt}) with its SHA-256, and the reproduction notebook \texttt{report.ipynb}. The notebook prints the parameter count (4,880,474), reloads the final checkpoint, regenerates the submitted CSV with 0 of 2,000 labels different, and recomputes the A4 holdout accuracy (97.92\%, 10-view TTA).
 
 \paragraph{Evaluation.}
 The competition metric is top-1 accuracy. The competition divides the 2,000 evaluation
@@ -49,7 +49,7 @@ blur 0.5, Gaussian noise $\sigma=0.02$, JPEG 75). The photographic proxies apply
 per-image brightness/contrast/saturation scaling plus a small zoom and rotation:
 \emph{mild} uses $\pm8\%$ brightness/contrast, $\pm12\%$ saturation, zoom 1.05 and
 $\pm3^\circ$; \emph{strong} uses $\pm20\%$, $\pm30\%$, zoom 1.15 and $\pm6^\circ$.
-These are label-free stress tests built from training images, not models of the
+These are synthetic corruptions of the labeled holdout, not models of the
 final test set.
 
 \paragraph{Compute.}

@@ -41,7 +41,7 @@ Most comparisons use a single seed; the exceptions are the two AugMix seeds and
 the ASAM confirm. The holdout is 5,000 images, so the seed-to-seed spread is
 0.2--0.4 points and small differences should not be over-interpreted. The B5 KD
 comparison is provisional at 200/300 epochs and was interrupted twice; its
-partial curves are in Figure~\ref{fig:curves}(f). The proxies are synthetic and label-free stress tests, not models of the final
+partial curves are in Figure~\ref{fig:curves}(f). The proxies are synthetic corruptions of the labeled holdout, not models of the final
 shift. Both leaderboards are 1,000 images, so they are noisy. We have no completed fresh 1,200-epoch ASAM,
 SWA, or LS-KD run (F1200\_asam stopped at epoch 250), and we did not test DKD or
 structural teacher pruning. Finally, the full-data models have no unbiased
